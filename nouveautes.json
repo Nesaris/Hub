@@ -1,0 +1,19 @@
+[
+  {
+    "version": "0.15.0",
+    "date": "2026-10-30",
+    "points": [
+      "Assistant de configuration : la première installation se règle dans l’interface, et une mise à jour ne demande plus que ses nouveaux réglages.",
+      "Réglages du Hub modifiables à tout moment dans Comptes → Réglages du service.",
+      "Cette fenêtre : ce qu’apporte chaque mise à jour, en quelques lignes, une seule fois.",
+      "Chaque service installé fait de même : assistant, réglages et nouveautés."
+    ]
+  },
+  {
+    "version": "0.14.4",
+    "date": "2026-10-25",
+    "points": [
+      "Le catalogue lit chaque dépôt à son dernier commit : les mises à jour apparaissent dès « Actualiser le catalogue »."
+    ]
+  }
+]

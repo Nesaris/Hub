@@ -1,0 +1,22 @@
+{
+  "format": "hub-registry/1",
+  "description": "Index du registre CodexX64/hub-registry. Chaque entrée pointe vers un manifeste hub.json.",
+  "extensions": [
+    {
+      "id": "docker-control",
+      "repo": "CodexX64/docker-control",
+      "ref": "v5.0.0",
+      "manifest": "hub.json",
+      "sha256": "À REMPLIR : sha256sum hub.json",
+      "composeSha256": "À REMPLIR : sha256sum deploy/compose.hub.yml"
+    },
+    {
+      "id": "ollama",
+      "manifest": "manifests/ollama.hub.json"
+    },
+    {
+      "id": "exemple",
+      "manifest": "exemple/hub.json"
+    }
+  ]
+}

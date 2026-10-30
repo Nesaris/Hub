@@ -1,0 +1,99 @@
+HUB — CE QUE LE SERVICE GARDE, ET POURQUOI
+
+Le Hub est installé et exploité par la personne qui l'héberge : c'est elle qui
+répond de ces données. Ce texte dit ce que le logiciel conserve, ce qu'il
+envoie ailleurs, et comment chacun exerce ses droits.
+
+1. CE QUI EST CONSERVÉ
+
+Compte
+  - identifiant, nom affiché, rôle, dates de création et de dernière connexion ;
+  - empreinte Argon2id du mot de passe (le mot de passe lui-même n'est jamais
+    gardé), secret TOTP chiffré, clés publiques des clés d'accès avec leur nom,
+    empreintes des codes de secours ;
+  - adresse d'alerte, si la personne en a vérifié une.
+  Finalité : se connecter et protéger le compte. Durée : tant que le compte existe.
+
+Sessions
+  - appareil (navigateur et système, sans empreinte), adresse IP, dates.
+  Finalité : lister et fermer ses appareils. Durée : douze heures au plus,
+  une heure sans activité.
+
+Événements de sécurité
+  - connexions, échecs, changements de facteurs, refus, avec l'adresse IP.
+  Finalité : détecter un abus et répondre à un incident. Durée : cinquante
+  derniers événements par compte.
+
+Journal du Hub
+  - chaque action (qui, quoi, sur quoi, quand) : services installés ou
+    connectés, workflows modifiés, clés posées, plans de l'assistant. Jamais
+    la valeur d'une clé.
+  Finalité : savoir qui a fait quoi. Durée : un an.
+
+Questions à l'assistant
+  - le texte de la question, le plan proposé et son résultat, rattachés au
+    compte qui l'a posée : chacun ne voit que sa conversation (un
+    administrateur voit aussi les plans qui attendent sa validation).
+  Finalité : l'historique de la conversation. Durée : 90 jours.
+
+Workflows
+  - leurs graphes et leurs versions, tant qu'ils existent ; les exécutions
+    (données reçues du déclencheur, sortie de chaque nœud) : les 200 dernières
+    par workflow, 90 jours au plus.
+
+Services, clés et variables
+  - adresses des services, réglages, clés d'API chiffrées (AES-256-GCM) ;
+    mesures des sondes : 7 jours par défaut.
+
+Mesures de la machine
+  - débits réseau, processeur et mémoire de la machine et de chaque
+    extension, par tranches de cinq minutes. Aucune adresse, aucun contenu.
+  Finalité : la Vue d'ensemble. Durée : 31 jours.
+
+Compteurs : appels à l'IA (sans contenu) 400 jours ; quotas du jour par
+compte, 7 jours.
+
+2. CE QUI PART AILLEURS
+
+  - Le fournisseur d'IA choisi par l'exploitant (Ollama de l'exploitant,
+    Anthropic, OpenAI, Google, Moonshot, Mistral ou un service compatible)
+    reçoit les questions à l'assistant, avec l'état des services et des
+    workflows qui sert à y répondre, et ce que les workflows lui confient.
+    Ses propres conditions s'appliquent ; certains traitent les données hors
+    de l'Union européenne.
+  - SYNAPSE, s'il est installé, reçoit un résumé des échanges des
+    administrateurs avec l'assistant et les événements des services, pour la
+    mémoire commune. Les échanges des autres comptes n'y entrent pas.
+  - Telegram, Discord, Slack, ntfy : les messages que l'assistant ou les
+    workflows y envoient, sur les comptes configurés par l'exploitant.
+  - ElevenLabs, si une clé est posée : le texte à dire.
+  - VOX, s'il est installé : l'audio d'une question vocale, et le texte à dire.
+  - GitHub : la liste des dépôts du catalogue, sans donnée personnelle.
+  - Le site de chaque service connu, une fois : son icône.
+  - Le relais SMTP de l'exploitant, s'il est configuré : les alertes de
+    sécurité, à l'adresse vérifiée.
+  Aucune mesure d'audience, aucun traceur, aucune publicité.
+
+3. COOKIES
+
+  Un cookie de session, indispensable à la connexion, et un cookie de
+  cérémonie de cinq minutes pendant une connexion par clé d'accès. Aucun autre.
+
+4. DROITS
+
+  - Accès et portabilité : page Sécurité, « Exporter mes données » (fichier JSON).
+  - Rectification : facteurs et adresse d'alerte depuis la page Sécurité ;
+    nom affiché et rôle, auprès d'un administrateur.
+  - Effacement : page Sécurité, « Supprimer mon compte » (une confirmation
+    récente est demandée), ou par un administrateur ; les questions à
+    l'assistant partent avec le compte, et au bout de 90 jours sinon.
+  - Toute demande : auprès de l'exploitant de cette instance.
+
+5. SÉCURITÉ ET INCIDENTS
+
+  Les mesures techniques et la conduite à tenir en cas d'incident, y compris
+  la notification d'une violation de données dans les 72 heures, sont décrites
+  dans SECURITY.md, dans le dépôt du projet.
+
+Le Hub n'est pas destiné aux mineurs et ne traite aucune catégorie
+particulière de données.

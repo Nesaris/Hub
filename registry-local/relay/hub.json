@@ -1,0 +1,443 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "relay",
+  "name": "Relay",
+  "version": "2.2.0",
+  "description": "Un nom par service : domaines Cloudflare sans rien sur les appareils, home.arpa par son résolveur, tunnel, santé. Ajoute la page Connexions au Hub.",
+  "icon": "globe",
+  "repository": "https://github.com/CodexX64/relay",
+  "license": "MIT",
+  "minHubVersion": "0.9.0",
+  "install": {
+    "type": "compose",
+    "compose": "deploy/compose.hub.yml",
+    "remote": {
+      "supported": true,
+      "label": "Adresse de Relay",
+      "placeholder": "http://192.0.2.10:8095",
+      "defaultPort": 8095,
+      "setupHelp": "Pour un Relay déjà en service ailleurs : poser RELAY_HUB_TOKEN dans son environnement, redémarrer, puis coller ce jeton ici."
+    },
+    "healthcheck": {
+      "type": "http",
+      "path": "/api/health",
+      "expect": 200,
+      "timeout": "5s"
+    },
+    "arch": [
+      "amd64",
+      "arm64"
+    ],
+    "resources": {
+      "ramMb": 384,
+      "cpu": 1.0,
+      "diskMb": 512
+    },
+    "ports": [
+      {
+        "name": "http",
+        "container": 8095,
+        "protocol": "http",
+        "expose": "proxy"
+      }
+    ],
+    "volumes": [
+      {
+        "name": "data",
+        "path": "/data"
+      },
+      {
+        "name": "caddy",
+        "path": "/data"
+      },
+      {
+        "name": "config",
+        "path": "/config"
+      },
+      {
+        "name": "admin",
+        "path": "/run/caddy"
+      },
+      {
+        "name": "dns",
+        "path": "/run/dns"
+      }
+    ]
+  },
+  "config": [
+    {
+      "key": "IMAGE_TAG",
+      "label": "Version de l'image",
+      "type": "string",
+      "default": "2.2.0",
+      "help": "Étiquette des images relay et relay-caddy.",
+      "advanced": true
+    },
+    {
+      "key": "RELAY_IP",
+      "label": "Adresse IP de cette machine",
+      "type": "string",
+      "help": "Vide : l'adresse de cette machine, que le Hub connaît (Réglages → Adresse de la machine). Les noms locaux y pointent et le résolveur n'écoute que sur elle.",
+      "pattern": "^(?!0\\.0\\.0\\.0$)(\\d{1,3}\\.){3}\\d{1,3}$",
+      "default": "{{hub.ip}}",
+      "advanced": true
+    },
+    {
+      "key": "RELAY_BIND",
+      "label": "Écoute des ports 80 et 443",
+      "type": "string",
+      "default": "0.0.0.0",
+      "advanced": true,
+      "help": "0.0.0.0 : toutes les interfaces. Une adresse précise pour n'écouter que sur elle.",
+      "pattern": "^(\\d{1,3}\\.){3}\\d{1,3}$"
+    },
+    {
+      "key": "RELAY_ZONE",
+      "label": "Zone locale",
+      "type": "string",
+      "default": "home.arpa",
+      "advanced": true,
+      "help": "Tous les noms de cette zone mènent à cette machine (résolveur de Relay, port 53). home.arpa est réservé aux réseaux domestiques."
+    },
+    {
+      "key": "ACME_EMAIL",
+      "label": "Adresse pour Let's Encrypt",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Contact des certificats publics (mode public). Facultative."
+    },
+    {
+      "key": "TUNNEL_ACTIF",
+      "label": "Connecteur du tunnel Cloudflare",
+      "type": "select",
+      "default": "0",
+      "required": true,
+      "options": [
+        {
+          "value": "0",
+          "label": "Arrêté"
+        },
+        {
+          "value": "1",
+          "label": "En marche"
+        }
+      ],
+      "help": "Réglé par le Hub (Connexions → Tunnel Cloudflare) : il lance cloudflared quand un tunnel est choisi.",
+      "advanced": true
+    },
+    {
+      "key": "TUNNEL_TOKEN",
+      "label": "Jeton du connecteur",
+      "type": "secret",
+      "help": "Posé par le Hub depuis Connexions → Tunnel Cloudflare. Il ne sert qu'à cloudflared.",
+      "advanced": true
+    },
+    {
+      "key": "CLOUDFLARED_TAG",
+      "label": "Version de cloudflared",
+      "type": "string",
+      "default": "2026.9.3",
+      "pattern": "^[0-9]{4}\\.[0-9]{1,2}\\.[0-9]{1,2}$",
+      "help": "Étiquette de l'image cloudflare/cloudflared du connecteur.",
+      "advanced": true
+    },
+    {
+      "key": "HUB_TOKEN",
+      "label": "Jeton du Hub",
+      "type": "secret",
+      "generate": "random:32",
+      "help": "Créé par le Hub. Il lui ouvre les routes de Relay (page Connexions, publication des services, jeton Cloudflare et tunnel) — jamais les comptes ni les jetons de services."
+    },
+    {
+      "key": "HUB_ADMIN_TOKEN",
+      "label": "Jeton d'administration des comptes",
+      "type": "secret",
+      "generate": "random:48",
+      "advanced": true,
+      "help": "Généré par le Hub, distinct du jeton du Hub : il ne sert qu'à gérer les comptes de Relay depuis Comptes des services."
+    },
+    {
+      "key": "SOCLE_HTTP",
+      "label": "Accès sans HTTPS",
+      "type": "select",
+      "default": "0",
+      "required": true,
+      "options": [
+        {
+          "value": "0",
+          "label": "Non — l'interface de Relay est servie en HTTPS (par Relay lui-même)"
+        },
+        {
+          "value": "1",
+          "label": "Oui — réseau de confiance, mode dégradé"
+        }
+      ],
+      "help": "Les clés d'accès n'existent qu'en HTTPS. En mode dégradé, l'administrateur se connecte avec mot de passe et application d'authentification, et Relay l'affiche partout.",
+      "advanced": true
+    },
+    {
+      "key": "SOCLE_CLE",
+      "label": "Clé maîtresse",
+      "type": "secret",
+      "generate": "random:32",
+      "help": "Scelle les secrets d'appareils (VNC, Redfish) et les secrets TOTP. Créée par le Hub, gardée dans son coffre, jamais sur le volume de Relay."
+    },
+    {
+      "key": "SOCLE_CLE_ANCIENNE",
+      "label": "Clé maîtresse remplacée",
+      "type": "secret",
+      "advanced": true,
+      "help": "Pendant une rotation seulement : la clé actuelle ici, une neuve dans « Clé maîtresse », redéployer, puis vider ce champ."
+    },
+    {
+      "key": "SOCLE_JETON_INSTALLATION",
+      "label": "Jeton d'installation",
+      "type": "secret",
+      "advanced": true,
+      "help": "Vide : Relay en tire un au premier démarrage et l'écrit dans ses journaux. Il ne sert qu'à créer le premier compte."
+    },
+    {
+      "key": "SOCLE_PROXYS",
+      "label": "Relais de confiance",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Plages (CIDR) des relais inverses autorisés à transmettre l'adresse du client. Vide : l'adresse vue est celle de la connexion."
+    },
+    {
+      "key": "SOCLE_ORIGINES",
+      "label": "Origines supplémentaires",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Adresses complètes acceptées en plus de celle de la page, quand un relais réécrit l'hôte."
+    },
+    {
+      "key": "SOCLE_URL_PUBLIQUE",
+      "label": "Adresse publique (courriels)",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Ex. https://relay.exemple. Les liens des courriels d'alerte en partent. Obligatoire avec un relais SMTP."
+    },
+    {
+      "key": "SOCLE_SMTP_HOTE",
+      "label": "Relais SMTP",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Vide : les alertes de sécurité restent visibles dans Relay, sans courriel."
+    },
+    {
+      "key": "SOCLE_SMTP_PORT",
+      "label": "Port SMTP",
+      "type": "number",
+      "min": 1,
+      "advanced": true,
+      "help": "Vide : 465 en TLS, 587 en STARTTLS."
+    },
+    {
+      "key": "SOCLE_SMTP_SECURITE",
+      "label": "Chiffrement SMTP",
+      "type": "select",
+      "default": "tls",
+      "advanced": true,
+      "options": [
+        {
+          "value": "tls",
+          "label": "TLS dès la connexion (465)"
+        },
+        {
+          "value": "starttls",
+          "label": "STARTTLS exigé (587)"
+        }
+      ]
+    },
+    {
+      "key": "SOCLE_SMTP_UTILISATEUR",
+      "label": "Identifiant SMTP",
+      "type": "string",
+      "default": "",
+      "advanced": true
+    },
+    {
+      "key": "SOCLE_SMTP_MOTDEPASSE",
+      "label": "Mot de passe SMTP",
+      "type": "secret",
+      "advanced": true
+    },
+    {
+      "key": "SOCLE_SMTP_DE",
+      "label": "Adresse d'expédition",
+      "type": "string",
+      "default": "",
+      "advanced": true
+    }
+  ],
+  "api": {
+    "baseUrl": "{{service.url}}",
+    "auth": {
+      "type": "bearer",
+      "token": "{{service.token}}",
+      "localToken": "HUB_TOKEN",
+      "remoteToken": "HUB_TOKEN"
+    }
+  },
+  "capabilities": {
+    "provides": [
+      "edge.routes"
+    ],
+    "requires": [],
+    "accepts": []
+  },
+  "triggers": [],
+  "actions": [
+    {
+      "id": "routes",
+      "name": "Routes publiées",
+      "description": "Chaque nom servi par Relay, sa cible, son mode et l'état de la cible.",
+      "icon": "globe",
+      "group": "Connexions",
+      "capability": "edge.routes",
+      "risk": "read",
+      "idempotent": true,
+      "params": [],
+      "request": {
+        "method": "GET",
+        "path": "/api/etat"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "routes": {
+            "type": "array"
+          }
+        }
+      },
+      "sample": {
+        "routes": [
+          {
+            "hote": "carte.exemple.fr",
+            "cible": "hub-mapmylan:8090",
+            "mode": "local",
+            "actif": true,
+            "sante": {
+              "ok": true,
+              "ms": 3
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "apply",
+      "name": "Réappliquer la configuration",
+      "description": "Repousse la configuration complète vers Caddy.",
+      "icon": "refresh",
+      "group": "Connexions",
+      "capability": "edge.routes",
+      "risk": "reversible",
+      "idempotent": true,
+      "params": [],
+      "request": {
+        "method": "POST",
+        "path": "/api/appliquer",
+        "body": {}
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "sample": {
+        "ok": true
+      }
+    }
+  ],
+  "probes": [
+    {
+      "id": "reachable",
+      "name": "Joignable",
+      "kind": "state",
+      "request": {
+        "method": "GET",
+        "path": "/api/health"
+      },
+      "value": "$.ok",
+      "states": {
+        "ok": [
+          true,
+          "true",
+          "ok"
+        ]
+      },
+      "interval": "30s"
+    }
+  ],
+  "permissions": {
+    "dockerSocket": "none",
+    "privileged": false,
+    "hostNetwork": false,
+    "capAdd": [],
+    "egress": [
+      "api.cloudflare.com",
+      "api.telegram.org",
+      "acme-v02.api.letsencrypt.org"
+    ]
+  },
+  "ai": {
+    "exposeActions": true,
+    "hints": "Relay publie les services sous un nom (HTTPS local ou Let's Encrypt, ou tunnel Cloudflare). Le Hub crée seul la route de chaque service qu'il installe ; la page Connexions du Hub montre et règle toutes les routes. « Routes publiées » pour voir ce qui répond."
+  },
+  "accounts": {
+    "tokenKey": "HUB_ADMIN_TOKEN",
+    "roles": [
+      "admin",
+      "membre",
+      "lecture"
+    ],
+    "adminRole": "admin",
+    "invitation": true,
+    "fields": {
+      "id": "$.id",
+      "name": "$.identifiant",
+      "role": "$.role",
+      "mfa": "$.a2f",
+      "created": "$.cree",
+      "lastSeen": "$.derniere"
+    },
+    "list": {
+      "method": "GET",
+      "path": "/api/compte/hub/comptes"
+    },
+    "create": {
+      "method": "POST",
+      "path": "/api/compte/hub/comptes",
+      "body": {
+        "identifiant": "{{params.username}}",
+        "role": "{{params.role}}"
+      }
+    },
+    "update": {
+      "method": "PATCH",
+      "path": "/api/compte/hub/comptes/{{params.id}}",
+      "body": {
+        "role": "{{params.role}}"
+      }
+    },
+    "reset": {
+      "method": "POST",
+      "path": "/api/compte/hub/comptes/{{params.id}}/reinit",
+      "body": {}
+    },
+    "remove": {
+      "method": "DELETE",
+      "path": "/api/compte/hub/comptes/{{params.id}}"
+    }
+  }
+}

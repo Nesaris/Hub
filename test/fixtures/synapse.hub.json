@@ -1,0 +1,208 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "synapse",
+  "name": "SYNAPSE",
+  "version": "2.0.0",
+  "description": "Mémoire commune des services (manifeste de test).",
+  "icon": "memory",
+  "install": {
+    "type": "compose",
+    "compose": "deploy/compose.hub.yml",
+    "remote": {
+      "supported": true,
+      "label": "Adresse de SYNAPSE",
+      "defaultPort": 8141
+    },
+    "ports": [
+      {
+        "name": "web",
+        "container": 8141,
+        "protocol": "http",
+        "expose": "proxy"
+      }
+    ],
+    "healthcheck": {
+      "type": "http",
+      "path": "/syn/health",
+      "expect": 200
+    }
+  },
+  "config": [
+    {
+      "key": "HUB_TOKEN",
+      "label": "Jeton du Hub",
+      "type": "secret",
+      "generate": "hub-token",
+      "advanced": true
+    },
+    {
+      "key": "REMOTE_TOKEN",
+      "label": "Jeton d'API",
+      "type": "secret"
+    },
+    {
+      "key": "LLM_FOURNISSEUR",
+      "label": "IA qui rédige les réponses",
+      "type": "select",
+      "default": "ollama",
+      "options": [
+        {
+          "value": "ollama",
+          "label": "Ollama (celui relié à SYNAPSE)"
+        },
+        {
+          "value": "kimi",
+          "label": "Kimi (Moonshot, par API)"
+        },
+        {
+          "value": "openai",
+          "label": "OpenAI (par API)"
+        },
+        {
+          "value": "compatible",
+          "label": "Autre API compatible OpenAI"
+        }
+      ],
+      "help": "Réponses, titres et fiche. La recherche par vecteurs reste sur Ollama dans tous les cas. Sans clé, SYNAPSE continue avec Ollama et l'indique."
+    },
+    {
+      "key": "LLM_CLE",
+      "label": "Clé d'API de l'IA",
+      "type": "secret",
+      "help": "Seulement pour Kimi, OpenAI ou une autre API. Kimi : platform.moonshot.ai → API Keys."
+    },
+    {
+      "key": "LLM_MODELE",
+      "label": "Modèle de l'IA",
+      "type": "string",
+      "default": "",
+      "help": "Vide = le modèle par défaut du fournisseur (Kimi : kimi-k2-0905-preview)."
+    },
+    {
+      "key": "LLM_URL",
+      "label": "Adresse de l'API",
+      "type": "string",
+      "default": "",
+      "advanced": true,
+      "help": "Vide = l'adresse du fournisseur choisi. À remplir pour « Autre API compatible OpenAI » (se termine par /v1)."
+    }
+  ],
+  "api": {
+    "baseUrl": "{{service.url}}/syn",
+    "auth": {
+      "type": "bearer",
+      "token": "{{service.token}}",
+      "localToken": "HUB_TOKEN",
+      "remoteToken": "REMOTE_TOKEN"
+    }
+  },
+  "capabilities": {
+    "provides": [
+      "memory.ingest",
+      "memory.search"
+    ],
+    "requires": [
+      "llm.embed"
+    ],
+    "accepts": []
+  },
+  "triggers": [],
+  "actions": [
+    {
+      "id": "fact.ingest",
+      "name": "Ingérer un fait",
+      "description": "Ajoute un fait daté à la mémoire.",
+      "capability": "memory.ingest",
+      "params": [
+        {
+          "key": "text",
+          "label": "Texte",
+          "type": "expression",
+          "required": true
+        },
+        {
+          "key": "tags",
+          "label": "Étiquettes",
+          "type": "json",
+          "default": []
+        },
+        {
+          "key": "space",
+          "label": "Espace",
+          "type": "select",
+          "options": [
+            "shared",
+            "savoir"
+          ],
+          "default": "shared"
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/v1/ingest",
+        "body": {
+          "text": "{{params.text}}",
+          "tags": "{{params.tags}}",
+          "space": "{{params.space}}"
+        }
+      },
+      "risk": "reversible",
+      "output": {
+        "type": "object"
+      },
+      "sample": {
+        "id": "fact_1"
+      }
+    },
+    {
+      "id": "memory.search",
+      "name": "Chercher en mémoire",
+      "description": "Recherche hybride.",
+      "capability": "memory.search",
+      "params": [
+        {
+          "key": "query",
+          "label": "Requête",
+          "type": "expression",
+          "required": true
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/v1/search",
+        "query": {
+          "q": "{{params.query}}"
+        },
+        "select": "$.hits"
+      },
+      "risk": "read",
+      "idempotent": true,
+      "output": {
+        "type": "array"
+      },
+      "sample": [
+        {
+          "text": "incident"
+        }
+      ]
+    }
+  ],
+  "probes": [
+    {
+      "id": "facts",
+      "name": "Faits stockés",
+      "kind": "gauge",
+      "request": {
+        "method": "GET",
+        "path": "/v1/stats"
+      },
+      "value": "$.facts",
+      "thresholds": {
+        "warn": 5,
+        "crit": 10
+      },
+      "interval": "10s"
+    }
+  ]
+}

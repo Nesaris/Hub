@@ -1,0 +1,14 @@
+{
+  "name": "hub",
+  "version": "0.15.0",
+  "description": "Hub centralisé de services auto-hébergés : extensions, services distants, déclencheurs, sondes, workflows et agent IA.",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=24.7" },
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server/entree.js",
+    "dev": "HUB_DATA=./data HUB_PUBLIC_URL=http://127.0.0.1:8100 node --disable-warning=ExperimentalWarning --watch server/entree.js",
+    "test": "node --disable-warning=ExperimentalWarning --test test/*.test.js"
+  }
+}

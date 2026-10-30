@@ -1,0 +1,32 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "exemple",
+  "name": "Exemple",
+  "version": "1.0.0",
+  "description": "Squelette d'extension à copier.",
+  "icon": "server",
+  "install": {
+    "type": "compose",
+    "compose": "deploy/compose.hub.yml",
+    "remote": { "supported": true, "label": "Adresse d'Exemple", "placeholder": "http://192.0.2.30:8080", "defaultPort": 8080 },
+    "ports": [{ "name": "web", "container": 8080, "protocol": "http", "expose": "proxy" }],
+    "volumes": [{ "name": "data", "path": "/data" }],
+    "healthcheck": { "type": "http", "port": "web", "path": "/health", "expect": 200 }
+  },
+  "config": [
+    { "key": "HUB_TOKEN", "label": "Jeton du Hub", "type": "secret", "generate": "hub-token", "advanced": true },
+    { "key": "REMOTE_TOKEN", "label": "Jeton d'API (mode distant)", "type": "secret" }
+  ],
+  "api": { "baseUrl": "{{service.url}}/api", "auth": { "type": "bearer", "token": "{{service.token}}", "localToken": "HUB_TOKEN", "remoteToken": "REMOTE_TOKEN" } },
+  "capabilities": { "provides": ["exemple.ping"], "requires": [], "accepts": [] },
+  "triggers": [],
+  "actions": [
+    { "id": "ping", "name": "Ping", "description": "Vérifie que le service répond.", "capability": "exemple.ping",
+      "request": { "method": "GET", "path": "/ping" }, "risk": "read", "idempotent": true,
+      "output": { "type": "object", "properties": { "pong": { "type": "boolean" } } }, "sample": { "pong": true } }
+  ],
+  "probes": [
+    { "id": "up", "name": "Disponible", "kind": "state", "request": { "method": "GET", "path": "/ping" }, "value": "$.pong", "states": { "ok": [true] }, "interval": "1m" }
+  ]
+}

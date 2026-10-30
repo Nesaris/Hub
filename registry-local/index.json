@@ -1,0 +1,18 @@
+{
+  "format": "hub-registry/1",
+  "description": "Registre local livré avec le Hub. Les extensions de ce dossier sont disponibles même sans accès à GitHub — VOX et Relay compris : leurs images se construisent sur l'hôte (voir leur README).",
+  "extensions": [
+    {
+      "id": "ollama",
+      "manifest": "manifests/ollama.hub.json"
+    },
+    {
+      "id": "vox",
+      "manifest": "vox/hub.json"
+    },
+    {
+      "id": "relay",
+      "manifest": "relay/hub.json"
+    }
+  ]
+}

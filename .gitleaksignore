@@ -1,0 +1,11 @@
+# Valeurs d'essai déjà dans l'historique, relevées par gitleaks et vérifiées une
+# à une : jetons fictifs des services simulés, clés ElevenLabs de forme
+# inventée, vecteur publié de la RFC 6238. Dans l'arbre, ces lignes portent
+# « gitleaks:allow » ; toute autre trouvaille fait échouer la vérification.
+b031893279b6d4b8995281dc7b6c914b56b27ba8:socle/test/crypto.test.js:generic-api-key:78
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:101
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:1089
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:1100
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:1104
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:1115
+7a8cd34bd14144ccc948e2857d1217bf45284928:test/hub.test.js:generic-api-key:1145

@@ -1,0 +1,202 @@
+# Hub — déploiement. Lancement : docker compose up -d --build
+name: hub
+
+services:
+  hub:
+    build: { context: ., target: hub }
+    image: hub:local
+    container_name: hub
+    restart: unless-stopped
+    depends_on: [docker-proxy]
+    env_file: [.env]
+    environment:
+      DOCKER_HOST: tcp://docker-proxy:2375
+      HUB_DOCKER_NETWORK: hub_net
+      # Clés maîtresses : secrets Docker, hors du volume de données. Une copie
+      # du volume, seule, ne déchiffre rien. install.sh les crée.
+      HUB_CLE_FILE: /run/secrets/hub_cle
+      SOCLE_CLE_FILE: /run/secrets/socle_cle
+      # Clés remplacées, pendant une rotation seulement (vides sinon).
+      HUB_CLE_ANCIENNE_FILE: /run/secrets/hub_cle_ancienne
+      SOCLE_CLE_ANCIENNE_FILE: /run/secrets/socle_cle_ancienne
+      # Clé publique des sauvegardes (vide tant qu'aucune n'est posée).
+      HUB_SAUVEGARDE_CLE_FILE: /run/secrets/sauvegarde_pub
+      # Certificat HTTPS (outils/tls-local.sh) : présent, le Hub sert HTTPS
+      # lui-même. Sans lui, il refuse d'être publié hors de 127.0.0.1.
+      HUB_TLS_DIR: /run/tls
+      HUB_BIND_IP: ${HUB_BIND_IP:-127.0.0.1}
+      # Compteurs de la machine déposés par hub-mesure (lecture seule ici).
+      HUB_MESURE_DIR: /run/mesure
+      # Jeton partagé avec le pont des outils d'abonnement (hub-outils-ia).
+      HUB_OUTILS_IA_JETON_FILE: /run/secrets/pont_jeton
+    secrets: [hub_cle, socle_cle, hub_cle_ancienne, socle_cle_ancienne, sauvegarde_pub, pont_jeton]
+    ports:
+      - "${HUB_BIND_IP:-127.0.0.1}:${HUB_BIND_PORT:-8100}:8100"
+    volumes:
+      - hub-data:/data
+      - ./secrets/tls:/run/tls:ro
+      - hub-mesure:/run/mesure:ro
+    networks: [hub_net, hub_socket, hub_outils]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 256
+    # Journaux du conteneur, où part aussi le journal de sécurité (chaîné) :
+    # gardés par le démon Docker, hors de portée du Hub, cinq fichiers de 10 Mo.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Renouvelle le certificat HTTPS (outils/renouveler.sh), une fois par jour :
+  # sans réseau, sans socket Docker, seul à voir la clé de l'autorité locale.
+  # Ne fait rien tant que HUB_TLS_NOM et HUB_TLS_IP sont vides.
+  hub-certificat:
+    build: { context: ., target: certificat }
+    image: hub-certificat:local
+    container_name: hub-certificat
+    restart: unless-stopped
+    init: true
+    user: "0"
+    entrypoint: ["sh", "/opt/hub/outils/renouveler.sh"]
+    environment:
+      HUB_TLS_NOM: ${HUB_TLS_NOM:-}
+      HUB_TLS_IP: ${HUB_TLS_IP:-}
+    volumes:
+      - ./secrets:/opt/hub/secrets
+      - ./outils:/opt/hub/outils:ro
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, FOWNER]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    pids_limit: 32
+
+  # Compteurs de la machine pour la Vue d'ensemble (outils/mesure-hote.sh) :
+  # le réseau de l'hôte, seul moyen de lire le trafic de ses cartes. Aucun
+  # port, aucune capacité, aucun accès au Hub ni à Docker ; il n'écrit qu'un
+  # fichier dans le volume hub-mesure. Sans lui, le Hub ne mesure que les
+  # conteneurs.
+  hub-mesure:
+    build: { context: ., target: mesure }
+    image: hub-mesure:local
+    container_name: hub-mesure
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    volumes:
+      - hub-mesure:/run/mesure
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 32m
+    cpus: 0.1
+    pids_limit: 16
+    logging:
+      driver: json-file
+      options: { max-size: "1m", max-file: "2" }
+
+  # Outils d'abonnement : Claude Code (abonnement Claude) et Codex (abonnement
+  # ChatGPT), lancés par le pont outils-ia/pont.mjs. Le compte se connecte une
+  # fois dans le conteneur et reste dans son volume :
+  #   docker exec -it hub-outils-ia claude setup-token
+  #   docker exec -it hub-outils-ia codex login --device-auth
+  # Seul le Hub lui parle : réseau à part (hub_outils), jeton partagé, aucun port publié.
+  hub-outils-ia:
+    build: { context: ., target: outils-ia }
+    image: hub-outils-ia:local
+    container_name: hub-outils-ia
+    restart: unless-stopped
+    init: true
+    environment:
+      PONT_JETON_FILE: /run/secrets/pont_jeton_outil
+    secrets: [pont_jeton_outil]
+    volumes:
+      - hub-outils-ia:/home/outil
+    networks: [hub_outils]
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1g
+    cpus: 1
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options: { max-size: "5m", max-file: "2" }
+
+  # Proxy du socket Docker : le Hub n'a jamais le socket en direct.
+  # Épinglée par empreinte : remplace-la après un « docker pull » volontaire.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+    container_name: hub-docker-proxy
+    restart: unless-stopped
+    environment:
+      POST: 1
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      INFO: 1
+      VERSION: 1
+      DISTRIBUTION: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      ALLOW_RESTARTS: 1
+      EXEC: 0
+      SERVICES: 0
+      SWARM: 0
+      SECRETS: 0
+      # Construire une image d'extension depuis son dépôt GitHub quand aucun
+      # registre ne l'a (server/construction.js). POST /build seul, par le
+      # constructeur classique ; rien de plus que ce que CONTAINERS + POST
+      # donnent déjà au Hub.
+      BUILD: 1
+      AUTH: 0
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [hub_socket]
+    read_only: true
+    # /tmp : cette image y écrit sa configuration HAProxy au démarrage
+    tmpfs: [/run, /tmp]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    pids_limit: 128
+
+networks:
+  # réseau partagé avec les services installés par le Hub
+  hub_net:
+    name: hub_net
+  # réseau privé hub <-> proxy de socket
+  hub_socket:
+    internal: true
+  # réseau privé hub <-> pont des outils d'abonnement : les services n'y entrent
+  # pas ; pas « internal », les outils joignent leurs fournisseurs
+  hub_outils: {}
+
+volumes:
+  hub-data:
+  hub-mesure:
+  hub-outils-ia:
+
+secrets:
+  # Le même jeton, deux fichiers : chacun lisible du seul utilisateur de son conteneur.
+  pont_jeton:
+    file: ./secrets/pont_jeton
+  pont_jeton_outil:
+    file: ./secrets/pont_jeton_outil
+  hub_cle:
+    file: ./secrets/hub_cle
+  socle_cle:
+    file: ./secrets/socle_cle
+  hub_cle_ancienne:
+    file: ./secrets/hub_cle_ancienne
+  socle_cle_ancienne:
+    file: ./secrets/socle_cle_ancienne
+  sauvegarde_pub:
+    file: ./secrets/sauvegarde.pub

@@ -1,0 +1,1182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "title": "Manifeste d'extension Hub (v1)",
+  "description": "Fichier hub.json placé à la racine du dépôt d'un service. Le Hub le lit pour installer, configurer et connecter le service, et pour exposer ses déclencheurs, actions et sondes dans les workflows.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifestVersion",
+    "id",
+    "name",
+    "version",
+    "description",
+    "install",
+    "capabilities",
+    "triggers",
+    "actions",
+    "probes"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "manifestVersion": {
+      "const": 1
+    },
+    "id": {
+      "$ref": "#/$defs/slug",
+      "description": "Identifiant unique et stable, identique au nom du dépôt."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[0-9A-Za-z.-]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 160
+    },
+    "icon": {
+      "type": "string",
+      "description": "Nom d'un picto du Hub (server, memory, ticket, map, mail, mic, chip, router…) ou chemin relatif vers un SVG 24x24 au trait."
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri"
+    },
+    "license": {
+      "type": "string"
+    },
+    "minHubVersion": {
+      "type": "string"
+    },
+    "replaces": {
+      "type": "array",
+      "description": "Extensions que celle-ci remplace (renommage). Un service installé depuis l'une d'elles se voit proposer celle-ci en mise à jour : le Hub reprend ses réglages, ses volumes et ses noms publiés.",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/slug",
+            "description": "Identifiant de l'extension remplacée."
+          },
+          "config": {
+            "type": "object",
+            "description": "Réglages renommés : ancienne clé → nouvelle clé.",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+            }
+          }
+        }
+      }
+    },
+    "install": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "healthcheck"
+      ],
+      "properties": {
+        "type": {
+          "enum": [
+            "compose",
+            "external"
+          ]
+        },
+        "compose": {
+          "type": "string",
+          "description": "Obligatoire en mode compose. Chemin relatif du fichier Compose. Les variables {{…}} y sont remplacées à l'installation."
+        },
+        "remote": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Connexion à une instance qui tourne sur une autre machine. Le Hub demande l'URL, teste le healthcheck puis utilise {{service.url}}.",
+          "required": [
+            "supported"
+          ],
+          "properties": {
+            "supported": {
+              "type": "boolean"
+            },
+            "label": {
+              "type": "string",
+              "description": "Ex. Adresse d'Ollama"
+            },
+            "placeholder": {
+              "type": "string",
+              "description": "Ex. http://192.0.2.50:11434"
+            },
+            "defaultPort": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "setupHelp": {
+              "type": "string",
+              "maxLength": 600,
+              "description": "Ce qu'il faut régler sur la machine distante (écoute réseau, pare-feu, jeton)."
+            }
+          }
+        },
+        "arch": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "amd64",
+              "arm64"
+            ]
+          },
+          "minItems": 1
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ramMb": {
+              "type": "integer",
+              "minimum": 16
+            },
+            "cpu": {
+              "type": "number",
+              "minimum": 0.1
+            },
+            "diskMb": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "ports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "container",
+              "protocol",
+              "expose"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/slug"
+              },
+              "container": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 65535
+              },
+              "protocol": {
+                "enum": [
+                  "http",
+                  "https",
+                  "tcp",
+                  "udp",
+                  "ws"
+                ]
+              },
+              "expose": {
+                "enum": [
+                  "proxy",
+                  "internal",
+                  "host"
+                ],
+                "description": "proxy : route Relay ; internal : réseau Docker seulement ; host : port publié sur 127.0.0.1."
+              }
+            }
+          }
+        },
+        "volumes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "path"
+            ],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/slug"
+              },
+              "path": {
+                "type": "string"
+              },
+              "backup": {
+                "type": "boolean",
+                "default": true
+              }
+            }
+          }
+        },
+        "healthcheck": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "http",
+                "tcp",
+                "docker"
+              ]
+            },
+            "port": {
+              "type": "string",
+              "description": "Nom d'un port déclaré."
+            },
+            "path": {
+              "type": "string",
+              "description": "Relatif à {{service.url}}."
+            },
+            "expect": {
+              "type": "integer"
+            },
+            "timeout": {
+              "$ref": "#/$defs/duration"
+            }
+          }
+        },
+        "postInstall": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/request"
+          },
+          "description": "Appels faits une fois le service en ligne (création du jeton Hub, etc.)."
+        }
+      },
+      "description": "Deux modes : compose (le Hub installe le conteneur sur sa machine) ou external (le service tourne déjà ailleurs, le Hub s'y connecte). Un service installable peut aussi autoriser la connexion à distance via remote.",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "compose"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "compose"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "external"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "remote"
+            ],
+            "properties": {
+              "remote": {
+                "properties": {
+                  "supported": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "config": {
+      "type": "array",
+      "description": "Variables demandées ou générées à l'installation. Référencées ailleurs par {{config.KEY}}.",
+      "items": {
+        "$ref": "#/$defs/field"
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "baseUrl",
+        "auth"
+      ],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "description": "Ex. {{service.url}}/api. {{service.url}} vaut l'adresse interne du conteneur en mode compose, ou l'URL saisie en mode distant."
+        },
+        "auth": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type"
+          ],
+          "properties": {
+            "type": {
+              "enum": [
+                "none",
+                "bearer",
+                "header",
+                "hmac"
+              ]
+            },
+            "header": {
+              "type": "string"
+            },
+            "token": {
+              "type": "string",
+              "description": "Utiliser {{service.token}} : le Hub y met la clé localToken en mode compose, la clé remoteToken en mode distant."
+            },
+            "localToken": {
+              "type": "string",
+              "description": "Clé de config utilisée comme jeton quand le Hub a installé le service."
+            },
+            "remoteToken": {
+              "type": "string",
+              "description": "Clé de config saisie par l'utilisateur quand le service tourne ailleurs."
+            }
+          }
+        }
+      }
+    },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provides": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "uniqueItems": true
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "uniqueItems": true
+        },
+        "accepts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "uniqueItems": true,
+          "description": "Capacités utilisées si un autre service les fournit. Le Hub crée alors un workflow Auto visible."
+        }
+      }
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Déclencheurs : ce qui peut démarrer un workflow.",
+      "items": {
+        "$ref": "#/$defs/trigger"
+      }
+    },
+    "actions": {
+      "type": "array",
+      "description": "Actionneurs : ce qu'un workflow ou l'agent IA peut demander au service.",
+      "items": {
+        "$ref": "#/$defs/action"
+      }
+    },
+    "probes": {
+      "type": "array",
+      "description": "Sondes : valeurs lues à intervalle régulier, affichées dans le Hub et utilisables comme seuils.",
+      "items": {
+        "$ref": "#/$defs/probe"
+      }
+    },
+    "autoWorkflows": {
+      "type": "array",
+      "description": "Workflows créés à l'installation quand la capacité visée est présente. Toujours visibles dans la page Workflows, étiquette Auto.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "name",
+          "when",
+          "steps"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/$defs/slug"
+          },
+          "name": {
+            "type": "string"
+          },
+          "when": {
+            "$ref": "#/$defs/capability",
+            "description": "Capacité qui doit être fournie par un service installé."
+          },
+          "steps": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "use"
+              ],
+              "properties": {
+                "use": {
+                  "type": "string",
+                  "description": "trigger:<id>, action:<id>, capability:<nom>.<action> ou core:<nœud>"
+                },
+                "params": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dockerSocket": {
+          "enum": [
+            "none",
+            "read",
+            "proxy"
+          ],
+          "default": "none"
+        },
+        "privileged": {
+          "const": false
+        },
+        "hostNetwork": {
+          "type": "boolean",
+          "default": false
+        },
+        "capAdd": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "egress": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Domaines ou CIDR que le service doit joindre."
+        }
+      }
+    },
+    "ai": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "exposeActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Les actions deviennent des outils de l'agent IA (les destructives restent soumises à validation)."
+        },
+        "hints": {
+          "type": "string",
+          "maxLength": 1000,
+          "description": "Contexte pour l'agent : à quoi sert le service, pièges connus."
+        }
+      }
+    },
+    "accounts": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Gestion des comptes du service depuis le Hub. Le jeton d'administration est une clé de config distincte du jeton de service.",
+      "required": [
+        "tokenKey",
+        "list",
+        "fields"
+      ],
+      "properties": {
+        "tokenKey": {
+          "type": "string",
+          "description": "Clé de `config` contenant le jeton d'administration (type secret)."
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "adminRole": {
+          "type": "string",
+          "description": "Rôle considéré comme administrateur, pour repérer le compte d'origine."
+        },
+        "fields": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "name"
+          ],
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "role": {
+              "type": "string"
+            },
+            "mfa": {
+              "type": "string"
+            },
+            "created": {
+              "type": "string"
+            },
+            "lastSeen": {
+              "type": "string"
+            },
+            "protected": {
+              "type": "string",
+              "description": "JSONPath d'un booléen : le service désigne lui-même le compte d'origine."
+            }
+          },
+          "description": "JSONPath de chaque colonne dans un élément de la liste."
+        },
+        "list": {
+          "$ref": "#/$defs/request"
+        },
+        "invitation": {
+          "type": "boolean",
+          "description": "La création ne pose aucun mot de passe : le service rend un lien d'invitation (champ lien) que l'invité ouvre pour choisir son mot de passe et ses facteurs."
+        },
+        "create": {
+          "$ref": "#/$defs/request",
+          "description": "Params disponibles : username, password (sauf invitation), role."
+        },
+        "update": {
+          "$ref": "#/$defs/request",
+          "description": "Params : id, role, username."
+        },
+        "password": {
+          "$ref": "#/$defs/request",
+          "description": "Params : id, password."
+        },
+        "requireMfa": {
+          "$ref": "#/$defs/request",
+          "description": "Params : id."
+        },
+        "reset": {
+          "$ref": "#/$defs/request",
+          "description": "Params : id. Le service rend un lien de réinitialisation (champ lien) : la personne choisit elle-même son nouveau mot de passe."
+        },
+        "remove": {
+          "$ref": "#/$defs/request",
+          "description": "Params : id."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,62}$"
+    },
+    "capability": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+\\.[a-z0-9-]+$"
+    },
+    "duration": {
+      "type": "string",
+      "pattern": "^\\d+(ms|s|m|h|d)$"
+    },
+    "field": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "label",
+        "type"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_]*$"
+        },
+        "label": {
+          "type": "string"
+        },
+        "help": {
+          "type": "string"
+        },
+        "type": {
+          "enum": [
+            "string",
+            "text",
+            "number",
+            "integer",
+            "boolean",
+            "select",
+            "multiselect",
+            "secret",
+            "duration",
+            "cron",
+            "json",
+            "expression",
+            "service-ref",
+            "workflow-ref",
+            "container-ref",
+            "node-ref",
+            "tags",
+            "voice"
+          ]
+        },
+        "required": {
+          "type": "boolean",
+          "default": false
+        },
+        "default": {},
+        "options": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "value",
+                  "label"
+                ],
+                "properties": {
+                  "value": {},
+                  "label": {
+                    "type": "string"
+                  },
+                  "group": {
+                    "type": "string",
+                    "description": "Rubrique du menu (voix : « Sur la machine », …)."
+                  },
+                  "detail": {
+                    "type": "string",
+                    "description": "Ligne secondaire sous le nom."
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "optionsFrom": {
+          "$ref": "#/$defs/optionsSource"
+        },
+        "generate": {
+          "type": "string",
+          "pattern": "^(random:\\d+|uuid|hub-token)$",
+          "description": "Pour type secret : valeur générée par le Hub."
+        },
+        "min": {
+          "type": "number"
+        },
+        "max": {
+          "type": "number"
+        },
+        "pattern": {
+          "type": "string"
+        },
+        "advanced": {
+          "type": "boolean",
+          "default": false
+        },
+        "resolve": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability"
+          ],
+          "description": "Valeur remplie par le Hub depuis un service installé qui annonce cette capacité. L'utilisateur n'a rien à recopier ; il peut toujours corriger.",
+          "properties": {
+            "capability": {
+              "type": "string",
+              "description": "Capacité du service qui détient la valeur (ex. llm.embed)."
+            },
+            "value": {
+              "type": "string",
+              "description": "Gabarit évalué sur le fournisseur : {{provider.url}}, {{provider.name}}, {{provider.config.CLE}}. Défaut : {{provider.url}}."
+            }
+          }
+        },
+        "showIf": {
+          "type": "object",
+          "description": "Le champ n'apparaît que si chaque champ nommé vaut l'une des valeurs listées. Ex. {\"ADVERSAIRE\": [\"claude-api\", \"openai\"]}. Masqué, il n'est ni affiché ni envoyé.",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "select",
+                  "multiselect",
+                  "voice"
+                ]
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "options"
+                ]
+              },
+              {
+                "required": [
+                  "optionsFrom"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "path"
+      ],
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "Relatif à api.baseUrl. Variables : {{params.x}}, {{config.X}}, {{state.x}}, {{hub.*}}, {{service.*}}."
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {},
+        "select": {
+          "type": "string",
+          "description": "JSONPath appliqué à la réponse (ex. $.data)."
+        },
+        "map": {
+          "type": "object",
+          "description": "Pour optionsFrom : { \"value\": \"$.id\", \"label\": \"$.name\" }."
+        }
+      }
+    },
+    "schemaRef": {
+      "type": "object",
+      "description": "JSON Schema (sous-ensemble) de la donnée produite, utilisé pour l'autocomplétion {{$json.…}}."
+    },
+    "trigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "delivery",
+        "output",
+        "sample"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "icon": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        },
+        "delivery": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "subscribe",
+                "signature"
+              ],
+              "properties": {
+                "type": {
+                  "const": "webhook"
+                },
+                "subscribe": {
+                  "$ref": "#/$defs/request",
+                  "description": "Appel qui abonne le Hub. Le corps peut utiliser {{hub.webhookUrl}} et {{hub.webhookSecret}}."
+                },
+                "unsubscribe": {
+                  "$ref": "#/$defs/request"
+                },
+                "signature": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "header",
+                    "algo"
+                  ],
+                  "properties": {
+                    "header": {
+                      "type": "string"
+                    },
+                    "algo": {
+                      "enum": [
+                        "hmac-sha256"
+                      ]
+                    },
+                    "prefix": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "select": {
+                  "type": "string"
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "request",
+                "interval"
+              ],
+              "properties": {
+                "type": {
+                  "const": "poll"
+                },
+                "request": {
+                  "$ref": "#/$defs/request"
+                },
+                "interval": {
+                  "$ref": "#/$defs/duration"
+                },
+                "items": {
+                  "type": "string",
+                  "description": "JSONPath du tableau d'éléments."
+                },
+                "dedupeKey": {
+                  "type": "string",
+                  "description": "JSONPath de l'identifiant unique d'un élément."
+                },
+                "cursor": {
+                  "type": "string",
+                  "description": "JSONPath du curseur à renvoyer en {{state.cursor}}."
+                }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type",
+                "path"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "sse",
+                    "websocket"
+                  ]
+                },
+                "path": {
+                  "type": "string"
+                },
+                "event": {
+                  "type": "string"
+                },
+                "filter": {
+                  "type": "string",
+                  "description": "Expression évaluée sur chaque message."
+                }
+              }
+            }
+          ]
+        },
+        "output": {
+          "$ref": "#/$defs/schemaRef"
+        },
+        "sample": {
+          "description": "Exemple réaliste de donnée produite."
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "description",
+        "request",
+        "risk",
+        "output",
+        "sample"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "icon": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "capability": {
+          "$ref": "#/$defs/capability",
+          "description": "Capacité que cette action réalise, si elle en réalise une."
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "risk": {
+          "enum": [
+            "read",
+            "reversible",
+            "destructive"
+          ],
+          "description": "destructive : toujours soumis à validation humaine, même en mode autonome."
+        },
+        "timeout": {
+          "$ref": "#/$defs/duration"
+        },
+        "idempotent": {
+          "type": "boolean"
+        },
+        "output": {
+          "$ref": "#/$defs/schemaRef"
+        },
+        "sample": {}
+      }
+    },
+    "probe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "kind",
+        "request",
+        "value",
+        "interval"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/slug"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "description": {
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "gauge",
+            "counter",
+            "state",
+            "text"
+          ]
+        },
+        "unit": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/field"
+          }
+        },
+        "request": {
+          "$ref": "#/$defs/request"
+        },
+        "value": {
+          "type": "string",
+          "description": "JSONPath de la valeur."
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "JSONPath de libellés (ex. { \"container\": \"$.name\" }) pour une sonde multi-séries."
+        },
+        "states": {
+          "type": "object",
+          "description": "Pour kind state : { \"ok\": [\"running\"], \"warn\": [\"restarting\"], \"crit\": [\"exited\"] }."
+        },
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warn": {
+              "type": "number"
+            },
+            "crit": {
+              "type": "number"
+            },
+            "direction": {
+              "enum": [
+                "above",
+                "below"
+              ],
+              "default": "above"
+            }
+          }
+        },
+        "interval": {
+          "$ref": "#/$defs/duration"
+        }
+      }
+    },
+    "optionsSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "path"
+      ],
+      "description": "Options dynamiques lues sur l'API d'un service. Par défaut celui qu'on configure ; avec `from.capability`, un autre service installé qui annonce cette capacité — ce qui permet de proposer une liste avant même que ce service-ci existe.",
+      "properties": {
+        "method": {
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ]
+        },
+        "path": {
+          "type": "string",
+          "description": "Relatif à api.baseUrl. Variables : {{params.x}}, {{config.X}}, {{state.x}}, {{hub.*}}, {{service.*}}."
+        },
+        "query": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "body": {},
+        "select": {
+          "type": "string",
+          "description": "JSONPath appliqué à la réponse (ex. $.data)."
+        },
+        "map": {
+          "type": "object",
+          "description": "Pour optionsFrom : { \"value\": \"$.id\", \"label\": \"$.name\" }."
+        },
+        "from": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "capability"
+          ],
+          "description": "Interroger un autre service, désigné par la capacité qu'il annonce.",
+          "properties": {
+            "capability": {
+              "type": "string",
+              "description": "Capacité annoncée par le service à interroger (ex. llm.embed)."
+            }
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "description": "Mots qui écartent une valeur : toute option dont la valeur contient l'un d'eux (sans tenir compte de la casse) est retirée. Ex. [\"embed\"] pour ne proposer que des modèles de conversation."
+        }
+      }
+    }
+  }
+}

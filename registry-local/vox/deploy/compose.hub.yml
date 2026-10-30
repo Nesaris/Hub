@@ -1,0 +1,125 @@
+# VOX installé par le Hub : gateway + écoute (Whisper) + voix (TTS).
+# Les valeurs entre accolades sont remplacées à l'installation : secrets
+# générés, ports d'hôte, volumes nommés et réseau partagé du Hub.
+#
+# Seule la gateway est publiée et rejoint le réseau du Hub : l'écoute et la
+# voix restent sur le réseau interne de la pile, la gateway les relaie.
+services:
+  gateway:
+    image: ghcr.io/codexx64/vox-gateway:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}
+    restart: unless-stopped
+    networks: [hub, vox]
+    ports:
+      - "{{hostport.http}}:8160"
+    environment:
+      PORT_GATEWAY: "8160"
+      DATA_DIR: /data
+      TZ: "{{hub.tz}}"
+      STT_URL: http://{{service.host}}-stt:8161
+      TTS_URL: http://{{service.host}}-tts:8162
+      # Le modèle de langage : celui du service qui fournit llm.chat (Ollama).
+      # Même contexte que l'assistant du Hub et SYNAPSE (16 k) : un contexte
+      # différent ferait recharger le modèle à chaque alternance.
+      OLLAMA_URL: {{provider.llm.chat.url}}
+      OLLAMA_MODEL: {{provider.llm.chat.config.DEFAULT_MODEL}}
+      OLLAMA_NUM_CTX: "16384"
+      TTS_VOICE: {{config.TTS_VOICE}}
+      TTS_MOTEURS: {{config.TTS_MOTEURS}}
+      VOX_TOKEN_SALT: {{config.TOKEN_SALT}}
+      # Ouvre /v1/transcrire et /v1/dire au Hub, et à lui seul.
+      VOX_HUB_TOKEN: {{config.HUB_TOKEN}}
+      # SYNAPSE (facultatif) : VOX y raconte ses échanges, ses pannes et son
+      # usage. Jeton de cerveau dérivé par le Hub, valable pour VOX seul.
+      # Sans SYNAPSE installé, les deux valent vide et rien ne part.
+      SYNAPSE_URL: "{{provider.memory.learn.url}}"
+      SYNAPSE_JETON: "{{provider.memory.learn.jetonCerveau}}"
+    volumes:
+      - {{volume.data}}:/data
+    depends_on:
+      stt: { condition: service_healthy }
+      tts: { condition: service_healthy }
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8160/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  stt:
+    image: ghcr.io/codexx64/vox-stt:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}-stt
+    restart: unless-stopped
+    networks: [vox]
+    environment:
+      PORT: "8161"
+      STT_MODEL: {{config.STT_MODEL}}
+      STT_COMPUTE: int8
+      STT_LANG: fr
+      STT_THREADS: "4"
+      STT_BEAM: "5"
+      STT_MODELE_VEILLE: tiny
+      STT_PRELOAD: "1"
+      STT_MOTS_CLES: {{config.STT_MOTS_CLES}}
+      HF_HOME: /models
+    volumes:
+      - {{volume.models}}:/models
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8161/health', timeout=4)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  tts:
+    image: ghcr.io/codexx64/vox-tts:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}-tts
+    restart: unless-stopped
+    networks: [vox]
+    environment:
+      PORT: "8162"
+      TTS_VOICE: {{config.TTS_VOICE}}
+      TTS_MOTEURS: {{config.TTS_MOTEURS}}
+      AZURE_TTS_KEY: {{config.AZURE_TTS_KEY}}
+      AZURE_TTS_REGION: francecentral
+      ELEVEN_API_KEY: {{config.ELEVEN_API_KEY}}
+      ELEVEN_MODEL: eleven_flash_v2_5
+      TTS_SPEAKER: "0"
+    volumes:
+      - {{volume.voices}}:/voices
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8162/health', timeout=4)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+networks:
+  hub:
+    name: {{hub.network}}
+    external: true
+  vox:
+    name: {{service.host}}-interne
+
+volumes:
+  {{volume.data}}:
+    name: {{volume.data}}
+  {{volume.models}}:
+    name: {{volume.models}}
+  {{volume.voices}}:
+    name: {{volume.voices}}

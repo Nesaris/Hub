@@ -1,0 +1,269 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "vox",
+  "name": "VOX",
+  "version": "6.3.0",
+  "description": "La voix de l'assistant : il t'entend (Whisper) et te répond à voix haute. Donne au Hub son mode vocal, et garde sa propre console en orbe.",
+  "icon": "mic",
+  "repository": "https://github.com/CodexX64/vox",
+  "license": "MIT",
+  "minHubVersion": "0.5.44",
+  "install": {
+    "type": "compose",
+    "compose": "deploy/compose.hub.yml",
+    "remote": {
+      "supported": true,
+      "label": "Adresse de la gateway VOX",
+      "placeholder": "http://192.0.2.40:8160",
+      "defaultPort": 8160,
+      "setupHelp": "Pour une pile VOX déjà en service ailleurs : poser VOX_HUB_TOKEN dans son .env, redémarrer la gateway, puis coller le même jeton ici."
+    },
+    "healthcheck": {
+      "type": "http",
+      "path": "/health",
+      "expect": 200,
+      "timeout": "5s"
+    },
+    "arch": [
+      "amd64",
+      "arm64"
+    ],
+    "resources": {
+      "ramMb": 2048,
+      "cpu": 2.0,
+      "diskMb": 4096
+    },
+    "ports": [
+      {
+        "name": "http",
+        "container": 8160,
+        "protocol": "http",
+        "expose": "proxy"
+      }
+    ],
+    "volumes": [
+      {
+        "name": "data",
+        "path": "/data"
+      },
+      {
+        "name": "models",
+        "path": "/models"
+      },
+      {
+        "name": "voices",
+        "path": "/voices"
+      }
+    ]
+  },
+  "config": [
+    {
+      "key": "IMAGE_TAG",
+      "label": "Version des images",
+      "type": "string",
+      "default": "latest",
+      "advanced": true,
+      "help": "Étiquette des trois images vox-gateway, vox-stt et vox-tts."
+    },
+    {
+      "key": "HUB_TOKEN",
+      "label": "Jeton du Hub",
+      "type": "secret",
+      "generate": "random:32",
+      "help": "Créé par le Hub à l'installation : il ouvre à lui seul l'écoute et la voix de VOX."
+    },
+    {
+      "key": "TOKEN_SALT",
+      "label": "Sel des jetons de VOX",
+      "type": "secret",
+      "generate": "random:32",
+      "advanced": true,
+      "help": "Sert à dériver les jetons des postes qui se connectent à la console de VOX."
+    },
+    {
+      "key": "STT_MODEL",
+      "label": "Modèle d'écoute (Whisper)",
+      "type": "select",
+      "default": "small",
+      "options": [
+        {
+          "value": "base",
+          "label": "base — rapide, comprend moins bien"
+        },
+        {
+          "value": "small",
+          "label": "small — le bon compromis sur CPU"
+        },
+        {
+          "value": "medium",
+          "label": "medium — comprend nettement mieux, deux fois plus lent"
+        }
+      ],
+      "help": "Téléchargé au premier appel dans le volume « models » (quelques centaines de Mo)."
+    },
+    {
+      "key": "STT_MOTS_CLES",
+      "label": "Vocabulaire à privilégier",
+      "type": "string",
+      "default": "Proxmox,Ollama,Docker,VLAN,VOX,SYNAPSE,MapMyLAN,Hub,workflow,Telegram,snapshot,conteneur",
+      "help": "Noms de tes machines et de tes services, séparés par des virgules : c'est le réglage qui change le plus la compréhension."
+    },
+    {
+      "key": "TTS_VOICE",
+      "label": "Voix",
+      "type": "string",
+      "default": "espeak:mb-fr1",
+      "help": "La voix par défaut. Elle se change aussi dans la console de VOX (appui long sur l'orbe)."
+    },
+    {
+      "key": "TTS_MOTEURS",
+      "label": "Moteurs de voix",
+      "type": "string",
+      "default": "espeak",
+      "advanced": true,
+      "help": "espeak (local, sans clé), azure, eleven — séparés par des virgules. Sans clé, un moteur cloud n'apparaît pas."
+    },
+    {
+      "key": "AZURE_TTS_KEY",
+      "label": "Clé Azure (voix)",
+      "type": "secret",
+      "advanced": true,
+      "help": "Facultative. 500 000 caractères par mois offerts."
+    },
+    {
+      "key": "ELEVEN_API_KEY",
+      "label": "Clé ElevenLabs (voix)",
+      "type": "secret",
+      "advanced": true,
+      "help": "Facultative. Meilleure qualité, facturée au caractère."
+    }
+  ],
+  "api": {
+    "baseUrl": "{{service.url}}",
+    "auth": {
+      "type": "bearer",
+      "token": "{{service.token}}",
+      "localToken": "HUB_TOKEN",
+      "remoteToken": "HUB_TOKEN"
+    }
+  },
+  "capabilities": {
+    "provides": [
+      "voice.stt",
+      "voice.tts"
+    ],
+    "requires": [
+      "llm.chat"
+    ],
+    "accepts": []
+  },
+  "triggers": [],
+  "actions": [
+    {
+      "id": "voices.list",
+      "name": "Lister les voix",
+      "description": "Les voix disponibles, tous moteurs confondus, et celle en service.",
+      "icon": "mic",
+      "group": "Voix",
+      "risk": "read",
+      "idempotent": true,
+      "params": [],
+      "request": {
+        "method": "GET",
+        "path": "/v1/voices"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "object"
+          },
+          "voices": {
+            "type": "array"
+          }
+        }
+      },
+      "sample": {
+        "current": {
+          "voice": "espeak:mb-fr1",
+          "speaker": 0,
+          "rate": 1
+        },
+        "voices": [
+          {
+            "id": "espeak:mb-fr1",
+            "label": "MBROLA fr1",
+            "genre": "homme",
+            "langue": "fr"
+          }
+        ]
+      }
+    },
+    {
+      "id": "etat",
+      "name": "État de la pile vocale",
+      "description": "Écoute (Whisper) et voix (TTS) : en service ou non.",
+      "icon": "pulse",
+      "group": "Voix",
+      "risk": "read",
+      "idempotent": true,
+      "params": [],
+      "request": {
+        "method": "GET",
+        "path": "/health"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "services": {
+            "type": "object"
+          }
+        }
+      },
+      "sample": {
+        "ok": true,
+        "version": "1.0",
+        "services": {
+          "stt": "ok",
+          "tts": "ok",
+          "ollama": "ok"
+        }
+      }
+    }
+  ],
+  "probes": [
+    {
+      "id": "reachable",
+      "name": "Joignable",
+      "kind": "state",
+      "request": {
+        "method": "GET",
+        "path": "/health"
+      },
+      "value": "$.ok",
+      "states": {
+        "ok": [
+          true,
+          "true",
+          "ok"
+        ]
+      },
+      "interval": "30s"
+    }
+  ],
+  "permissions": {
+    "dockerSocket": "none",
+    "privileged": false,
+    "hostNetwork": false,
+    "capAdd": [],
+    "egress": []
+  },
+  "ai": {
+    "exposeActions": true,
+    "hints": "VOX donne sa voix au Hub : le bouton micro du panneau de l'assistant passe par lui pour entendre (Whisper) et pour répondre à voix haute. Le cerveau reste celui du Hub. Une réponse vocale est courte : deux ou trois phrases parlées, les chiffres passent par les widgets."
+  }
+}

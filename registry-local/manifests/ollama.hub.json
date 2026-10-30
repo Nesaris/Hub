@@ -1,0 +1,446 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "ollama",
+  "name": "Ollama",
+  "version": "1.0.0",
+  "description": "Modèles d'IA locaux, sur cette machine ou sur un autre ordinateur du réseau.",
+  "icon": "chip",
+  "repository": "https://github.com/CodexX64/hub-registry",
+  "license": "MIT",
+  "minHubVersion": "1.0.0",
+  "install": {
+    "type": "external",
+    "remote": {
+      "supported": true,
+      "label": "Adresse d'Ollama",
+      "placeholder": "http://192.0.2.50:11434",
+      "defaultPort": 11434,
+      "setupHelp": "Sur la machine qui fait tourner Ollama : définir OLLAMA_HOST=0.0.0.0:11434 puis redémarrer Ollama. Autoriser le port 11434 uniquement depuis l'IP du Hub dans le pare-feu. Ollama n'a pas d'authentification : ne jamais l'exposer sur Internet."
+    },
+    "healthcheck": {
+      "type": "http",
+      "path": "/api/version",
+      "expect": 200,
+      "timeout": "5s"
+    }
+  },
+  "config": [
+    {
+      "key": "DEFAULT_MODEL",
+      "label": "Modèle par défaut",
+      "type": "select",
+      "optionsFrom": {
+        "method": "GET",
+        "path": "/api/tags",
+        "select": "$.models",
+        "map": {
+          "value": "$.name",
+          "label": "$.name"
+        }
+      },
+      "required": true,
+      "help": "Choisi une fois ici, il sert à toutes les actions qui n'en nomment pas un. Sans lui, Ollama refuse chaque requête."
+    },
+    {
+      "key": "EMBED_MODEL",
+      "label": "Modèle d'embeddings",
+      "type": "select",
+      "default": "nomic-embed-text",
+      "optionsFrom": {
+        "method": "GET",
+        "path": "/api/tags",
+        "select": "$.models",
+        "map": {
+          "value": "$.name",
+          "label": "$.name"
+        }
+      }
+    },
+    {
+      "key": "PROXY_TOKEN",
+      "label": "Jeton du proxy (facultatif)",
+      "type": "secret",
+      "help": "Seulement si Ollama est placé derrière un proxy qui exige un jeton.",
+      "advanced": true
+    }
+  ],
+  "api": {
+    "baseUrl": "{{service.url}}",
+    "auth": {
+      "type": "bearer",
+      "token": "{{service.token}}",
+      "remoteToken": "PROXY_TOKEN"
+    }
+  },
+  "capabilities": {
+    "provides": [
+      "llm.chat",
+      "llm.generate",
+      "llm.embed",
+      "models.list"
+    ],
+    "requires": [],
+    "accepts": []
+  },
+  "triggers": [
+    {
+      "id": "model.loaded",
+      "name": "Modèle chargé en mémoire",
+      "description": "Un modèle vient d'être chargé sur la machine Ollama.",
+      "icon": "chip",
+      "group": "Modèles",
+      "delivery": {
+        "type": "poll",
+        "request": {
+          "method": "GET",
+          "path": "/api/ps"
+        },
+        "interval": "30s",
+        "items": "$.models",
+        "dedupeKey": "$.digest"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "size_vram": {
+            "type": "integer"
+          },
+          "expires_at": {
+            "type": "string"
+          }
+        }
+      },
+      "sample": {
+        "name": "qwen3:14b",
+        "size_vram": 10485760000,
+        "expires_at": "2026-09-17T14:07:11Z"
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "chat",
+      "name": "Conversation",
+      "description": "Envoie des messages au modèle et renvoie sa réponse.",
+      "icon": "chat",
+      "group": "Génération",
+      "capability": "llm.chat",
+      "params": [
+        {
+          "key": "model",
+          "label": "Modèle",
+          "type": "select",
+          "default": "{{config.DEFAULT_MODEL}}",
+          "optionsFrom": {
+            "method": "GET",
+            "path": "/api/tags",
+            "select": "$.models",
+            "map": {
+              "value": "$.name",
+              "label": "$.name"
+            }
+          },
+          "required": true
+        },
+        {
+          "key": "system",
+          "label": "Consigne système",
+          "type": "text"
+        },
+        {
+          "key": "prompt",
+          "label": "Message",
+          "type": "expression",
+          "required": true
+        },
+        {
+          "key": "temperature",
+          "label": "Température",
+          "type": "number",
+          "default": 0.3,
+          "min": 0,
+          "max": 2,
+          "advanced": true
+        },
+        {
+          "key": "format",
+          "label": "Format de sortie",
+          "type": "select",
+          "options": [
+            {
+              "value": "",
+              "label": "Texte"
+            },
+            {
+              "value": "json",
+              "label": "JSON"
+            }
+          ],
+          "default": ""
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/chat",
+        "body": {
+          "model": "{{params.model}}",
+          "stream": false,
+          "format": "{{params.format}}",
+          "options": {
+            "temperature": "{{params.temperature}}"
+          },
+          "messages": [
+            {
+              "role": "system",
+              "content": "{{params.system}}"
+            },
+            {
+              "role": "user",
+              "content": "{{params.prompt}}"
+            }
+          ]
+        }
+      },
+      "risk": "read",
+      "timeout": "5m",
+      "output": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "content": {
+                "type": "string"
+              }
+            }
+          },
+          "total_duration": {
+            "type": "integer"
+          }
+        }
+      },
+      "sample": {
+        "message": {
+          "role": "assistant",
+          "content": "helpdesk-web tombe en OOM (code 137)."
+        },
+        "total_duration": 2140000000
+      }
+    },
+    {
+      "id": "embed",
+      "name": "Embeddings",
+      "description": "Transforme un ou plusieurs textes en vecteurs.",
+      "icon": "memory",
+      "group": "Génération",
+      "capability": "llm.embed",
+      "params": [
+        {
+          "key": "model",
+          "label": "Modèle",
+          "type": "string",
+          "default": "{{config.EMBED_MODEL}}"
+        },
+        {
+          "key": "input",
+          "label": "Texte",
+          "type": "expression",
+          "required": true
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/embed",
+        "body": {
+          "model": "{{params.model}}",
+          "input": "{{params.input}}"
+        }
+      },
+      "risk": "read",
+      "timeout": "60s",
+      "output": {
+        "type": "object",
+        "properties": {
+          "embeddings": {
+            "type": "array"
+          }
+        }
+      },
+      "sample": {
+        "embeddings": [
+          [
+            0.012,
+            -0.034,
+            0.118
+          ]
+        ]
+      }
+    },
+    {
+      "id": "models.list",
+      "name": "Lister les modèles",
+      "description": "Modèles téléchargés sur la machine Ollama.",
+      "icon": "chip",
+      "group": "Modèles",
+      "capability": "models.list",
+      "request": {
+        "method": "GET",
+        "path": "/api/tags",
+        "select": "$.models"
+      },
+      "risk": "read",
+      "idempotent": true,
+      "output": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "size": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "sample": [
+        {
+          "name": "qwen3:14b",
+          "size": 9276198565
+        },
+        {
+          "name": "nomic-embed-text:latest",
+          "size": 274302450
+        }
+      ]
+    },
+    {
+      "id": "models.pull",
+      "name": "Télécharger un modèle",
+      "description": "Télécharge un modèle sur la machine Ollama. Peut prendre plusieurs gigaoctets.",
+      "icon": "export",
+      "group": "Modèles",
+      "params": [
+        {
+          "key": "model",
+          "label": "Modèle",
+          "type": "string",
+          "required": true,
+          "help": "Ex. qwen3:8b"
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/pull",
+        "body": {
+          "model": "{{params.model}}",
+          "stream": false
+        }
+      },
+      "risk": "reversible",
+      "timeout": "60m",
+      "output": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "sample": {
+        "status": "success"
+      }
+    },
+    {
+      "id": "models.delete",
+      "name": "Supprimer un modèle",
+      "description": "Supprime un modèle de la machine Ollama.",
+      "icon": "stop",
+      "group": "Modèles",
+      "params": [
+        {
+          "key": "model",
+          "label": "Modèle",
+          "type": "select",
+          "required": true,
+          "optionsFrom": {
+            "method": "GET",
+            "path": "/api/tags",
+            "select": "$.models",
+            "map": {
+              "value": "$.name",
+              "label": "$.name"
+            }
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/api/delete",
+        "body": {
+          "model": "{{params.model}}"
+        }
+      },
+      "risk": "destructive",
+      "output": {
+        "type": "object"
+      },
+      "sample": {}
+    }
+  ],
+  "probes": [
+    {
+      "id": "reachable",
+      "name": "Joignable",
+      "kind": "state",
+      "request": {
+        "method": "GET",
+        "path": "/api/version"
+      },
+      "value": "$.version",
+      "interval": "30s"
+    },
+    {
+      "id": "loaded.count",
+      "name": "Modèles chargés",
+      "kind": "gauge",
+      "request": {
+        "method": "GET",
+        "path": "/api/ps"
+      },
+      "value": "$.models.length",
+      "interval": "1m"
+    },
+    {
+      "id": "loaded.vram",
+      "name": "Mémoire vidéo utilisée",
+      "kind": "gauge",
+      "unit": "octets",
+      "request": {
+        "method": "GET",
+        "path": "/api/ps",
+        "select": "$.models"
+      },
+      "value": "$.size_vram",
+      "labels": {
+        "model": "$.name"
+      },
+      "interval": "1m"
+    }
+  ],
+  "permissions": {
+    "dockerSocket": "none",
+    "privileged": false,
+    "hostNetwork": false,
+    "egress": []
+  },
+  "ai": {
+    "exposeActions": true,
+    "hints": "Ollama peut tourner sur une autre machine que le Hub, souvent plus lente à répondre au premier appel (chargement du modèle). Prévoir un délai long. Ne jamais supprimer ni télécharger de modèle sans validation."
+  }
+}

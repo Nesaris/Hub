@@ -1,0 +1,33 @@
+# Modèle de Compose pour une extension installable par le Hub.
+# Variables remplacées à l'installation :
+#   {{service.host}}     nom du conteneur (hub-<instance>), joignable sur le réseau du Hub
+#   {{port.<nom>}}       port conteneur déclaré dans install.ports
+#   {{hostport.<nom>}}   127.0.0.1:81xy, uniquement pour expose = host
+#   {{volume.<nom>}}     nom du volume Docker (hub-<instance>-<nom>)
+#   {{config.<CLE>}}     valeur de config (secrets générés par le Hub)
+#   {{hub.network}}      réseau Docker partagé avec le Hub
+# Toujours interdit : privileged, socket Docker monté.
+# Sur déclaration dans le manifeste et validation de l'utilisateur : network_mode host
+# (permissions.hostNetwork) et cap_add (permissions.capAdd).
+services:
+  app:
+    image: ghcr.io/codexx64/exemple:1.0.0
+    container_name: {{service.host}}
+    restart: unless-stopped
+    environment:
+      API_TOKEN: {{config.HUB_TOKEN}}
+    volumes:
+      - {{volume.data}}:/data
+    networks: [hub]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+      interval: 30s
+volumes:
+  {{volume.data}}:
+    name: {{volume.data}}
+networks:
+  hub:
+    name: {{hub.network}}
+    external: true

@@ -1,0 +1,166 @@
+# Relay installé par le Hub : Caddy (le trafic, ports 80 et 443 de la
+# machine), un résolveur pour la zone locale (port 53) et Relay (les routes,
+# l'interface, l'API du Hub). Les {{...}} sont remplacés à l'installation :
+# secrets générés, port d'hôte de l'interface, volumes nommés et réseau
+# partagé du Hub, où Caddy joint chaque service par son nom de conteneur.
+services:
+  caddy:
+    image: ghcr.io/codexx64/relay-caddy:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}-caddy
+    restart: unless-stopped
+    # hub : les services qu'il sert ; tunnel : le seul chemin du connecteur Cloudflare.
+    networks: [hub, tunnel]
+    ports:
+      - "{{config.RELAY_BIND}}:80:80"
+      - "{{config.RELAY_BIND}}:443:443"
+      - "{{config.RELAY_BIND}}:443:443/udp"
+    # Ni root ni capacité : le conteneur ouvre ses ports bas par ce réglage,
+    # propre à son espace réseau.
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "80"
+    volumes:
+      - {{volume.caddy}}:/data
+      - {{volume.config}}:/config
+      # L'API d'administration de Caddy : un socket dans ce volume, que seuls
+      # Caddy et Relay montent. Aucun port ne l'expose.
+      - {{volume.admin}}:/run/caddy
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  # Chaque nom servi par Relay (quel que soit le domaine) et toute la zone
+  # locale (home.arpa) mènent à cette machine, le reste est transmis. Il n'écoute que sur l'adresse de la machine : pose-le comme
+  # DNS de la zone sur tes postes (/etc/resolver sur Mac) ou sur la box.
+  dns:
+    image: ghcr.io/codexx64/relay-dns:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}-dns
+    restart: unless-stopped
+    networks: [hub]
+    command: ["--address=/{{config.RELAY_ZONE}}/{{config.RELAY_IP}}"]
+    volumes:
+      - {{volume.dns}}:/etc/relay-hosts:ro
+    ports:
+      - "{{config.RELAY_IP}}:53:53/udp"
+      - "{{config.RELAY_IP}}:53:53/tcp"
+    sysctls:
+      net.ipv4.ip_unprivileged_port_start: "53"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 64m
+    cpus: 0.25
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  relay:
+    image: ghcr.io/codexx64/relay:{{config.IMAGE_TAG}}
+    container_name: {{service.host}}
+    restart: unless-stopped
+    depends_on: [caddy]
+    networks: [hub]
+    ports:
+      - "{{hostport.http}}:8095"
+    volumes:
+      - {{volume.data}}:/data
+      - {{volume.admin}}:/run/caddy
+      - {{volume.dns}}:/run/dns
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    environment:
+      PORT: "8095"
+      DATA_DIR: /data
+      RELAY_CADDY_SOCKET: /run/caddy/admin.sock
+      # cloudflared joint Caddy en clair sur le réseau du tunnel.
+      RELAY_CADDY_SERVICE: "http://{{service.host}}-caddy:80"
+      # Jeton du Hub : les routes et la publication des services, jamais les
+      # comptes, les jetons de services ni les réglages.
+      RELAY_HUB_TOKEN: "{{config.HUB_TOKEN}}"
+      RELAY_IP: "{{config.RELAY_IP}}"
+      RELAY_DNS_DIR: /run/dns
+      ACME_EMAIL: "{{config.ACME_EMAIL}}"
+      SOCLE_CLE: "{{config.SOCLE_CLE}}"
+      SOCLE_CLE_ANCIENNE: "{{config.SOCLE_CLE_ANCIENNE}}"
+      SOCLE_HTTP: "{{config.SOCLE_HTTP}}"
+      SOCLE_JETON_INSTALLATION: "{{config.SOCLE_JETON_INSTALLATION}}"
+      SOCLE_JETON_ADMIN_HUB: "{{config.HUB_ADMIN_TOKEN}}"
+      SOCLE_PROXYS: "{{config.SOCLE_PROXYS}}"
+      SOCLE_ORIGINES: "{{config.SOCLE_ORIGINES}}"
+      SOCLE_THEME: "{{hub.theme}}"
+      SOCLE_URL_PUBLIQUE: "{{config.SOCLE_URL_PUBLIQUE}}"
+      SOCLE_SMTP_HOTE: "{{config.SOCLE_SMTP_HOTE}}"
+      SOCLE_SMTP_PORT: "{{config.SOCLE_SMTP_PORT}}"
+      SOCLE_SMTP_SECURITE: "{{config.SOCLE_SMTP_SECURITE}}"
+      SOCLE_SMTP_UTILISATEUR: "{{config.SOCLE_SMTP_UTILISATEUR}}"
+      SOCLE_SMTP_MOTDEPASSE: "{{config.SOCLE_SMTP_MOTDEPASSE}}"
+      SOCLE_SMTP_DE: "{{config.SOCLE_SMTP_DE}}"
+      TZ: "{{hub.tz}}"
+
+  # Le connecteur du tunnel Cloudflare : aucun conteneur tant que le Hub ne
+  # l'active (Connexions → Tunnel Cloudflare), qui pose alors son jeton. Seul
+  # sur son réseau avec Caddy : il ne joint aucun service sans passer par lui,
+  # même si l'ingress du tunnel était réécrit. Cloudflare porte le TLS.
+  tunnel:
+    image: cloudflare/cloudflared:{{config.CLOUDFLARED_TAG}}
+    container_name: {{service.host}}-tunnel
+    restart: unless-stopped
+    networks: [tunnel]
+    deploy:
+      replicas: {{config.TUNNEL_ACTIF}}
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: "{{config.TUNNEL_TOKEN}}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.5
+    pids_limit: 64
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  hub:
+    name: {{hub.network}}
+    external: true
+  # Propre à cette pile : Caddy et le connecteur, rien d'autre.
+  tunnel: {}
+
+volumes:
+  {{volume.data}}:
+    name: {{volume.data}}
+  {{volume.caddy}}:
+    name: {{volume.caddy}}
+  {{volume.config}}:
+    name: {{volume.config}}
+  {{volume.admin}}:
+    name: {{volume.admin}}
+  {{volume.dns}}:
+    name: {{volume.dns}}

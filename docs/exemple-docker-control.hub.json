@@ -1,0 +1,721 @@
+{
+  "$schema": "https://raw.githubusercontent.com/CodexX64/hub-registry/main/schema/hub-extension.v1.json",
+  "manifestVersion": 1,
+  "id": "docker-control",
+  "name": "docker-control",
+  "version": "5.0.0",
+  "description": "Gestion des conteneurs sur plusieurs nœuds : état, logs, métriques, déploiement.",
+  "icon": "server",
+  "repository": "https://github.com/CodexX64/docker-control",
+  "license": "MIT",
+  "minHubVersion": "1.0.0",
+  "install": {
+    "type": "compose",
+    "compose": "deploy/compose.hub.yml",
+    "remote": {
+      "supported": true,
+      "label": "Adresse de docker-control",
+      "placeholder": "http://192.0.2.20:8110",
+      "defaultPort": 8110,
+      "setupHelp": "Créer un jeton d'API dans Réglages > Jetons de docker-control et le coller dans le Hub. N'ouvrir le port 8110 qu'à l'IP du Hub."
+    },
+    "arch": [
+      "amd64",
+      "arm64"
+    ],
+    "resources": {
+      "ramMb": 384,
+      "cpu": 0.5,
+      "diskMb": 500
+    },
+    "ports": [
+      {
+        "name": "web",
+        "container": 8110,
+        "protocol": "http",
+        "expose": "proxy"
+      },
+      {
+        "name": "agent",
+        "container": 8111,
+        "protocol": "ws",
+        "expose": "internal"
+      }
+    ],
+    "volumes": [
+      {
+        "name": "data",
+        "path": "/app/data",
+        "backup": true
+      }
+    ],
+    "healthcheck": {
+      "type": "http",
+      "port": "web",
+      "path": "/api/health",
+      "expect": 200,
+      "timeout": "5s"
+    },
+    "postInstall": [
+      {
+        "method": "POST",
+        "path": "/admin/api-tokens",
+        "headers": {
+          "X-Bootstrap-Token": "{{config.BOOTSTRAP_TOKEN}}"
+        },
+        "body": {
+          "name": "hub",
+          "token": "{{config.HUB_TOKEN}}",
+          "scopes": [
+            "read",
+            "control",
+            "webhooks"
+          ]
+        }
+      }
+    ]
+  },
+  "config": [
+    {
+      "key": "BOOTSTRAP_TOKEN",
+      "label": "Jeton d'amorçage",
+      "type": "secret",
+      "generate": "random:32",
+      "advanced": true
+    },
+    {
+      "key": "HUB_TOKEN",
+      "label": "Jeton du Hub",
+      "type": "secret",
+      "generate": "hub-token",
+      "advanced": true
+    },
+    {
+      "key": "REMOTE_TOKEN",
+      "label": "Jeton d'API (mode distant)",
+      "type": "secret",
+      "help": "Seulement si docker-control tourne sur une autre machine."
+    },
+    {
+      "key": "METRICS_RETENTION",
+      "label": "Rétention des métriques",
+      "type": "duration",
+      "default": "30d"
+    },
+    {
+      "key": "LOG_LEVEL",
+      "label": "Niveau de log",
+      "type": "select",
+      "options": [
+        "error",
+        "warn",
+        "info",
+        "debug"
+      ],
+      "default": "info",
+      "advanced": true
+    }
+  ],
+  "api": {
+    "baseUrl": "{{service.url}}/api",
+    "auth": {
+      "type": "bearer",
+      "token": "{{service.token}}",
+      "localToken": "HUB_TOKEN",
+      "remoteToken": "REMOTE_TOKEN"
+    }
+  },
+  "capabilities": {
+    "provides": [
+      "containers.events",
+      "containers.control",
+      "containers.metrics"
+    ],
+    "requires": [],
+    "accepts": [
+      "memory.ingest"
+    ]
+  },
+  "triggers": [
+    {
+      "id": "container.event",
+      "name": "Événement conteneur",
+      "description": "Un conteneur démarre, s'arrête, redémarre, meurt ou devient unhealthy.",
+      "icon": "server",
+      "group": "Conteneurs",
+      "params": [
+        {
+          "key": "events",
+          "label": "Événements",
+          "type": "multiselect",
+          "options": [
+            "start",
+            "stop",
+            "restart",
+            "die",
+            "oom",
+            "health_unhealthy"
+          ],
+          "default": [
+            "restart",
+            "die",
+            "oom"
+          ],
+          "required": true
+        },
+        {
+          "key": "container",
+          "label": "Conteneur",
+          "type": "select",
+          "default": "*",
+          "optionsFrom": {
+            "method": "GET",
+            "path": "/containers",
+            "select": "$.items",
+            "map": {
+              "value": "$.name",
+              "label": "$.name"
+            }
+          }
+        },
+        {
+          "key": "node",
+          "label": "Nœud",
+          "type": "node-ref",
+          "default": "*"
+        }
+      ],
+      "delivery": {
+        "type": "webhook",
+        "subscribe": {
+          "method": "POST",
+          "path": "/webhooks",
+          "body": {
+            "url": "{{hub.webhookUrl}}",
+            "secret": "{{hub.webhookSecret}}",
+            "events": "{{params.events}}",
+            "filter": {
+              "container": "{{params.container}}",
+              "node": "{{params.node}}"
+            }
+          },
+          "select": "$.id"
+        },
+        "unsubscribe": {
+          "method": "DELETE",
+          "path": "/webhooks/{{state.subscriptionId}}"
+        },
+        "signature": {
+          "header": "X-DC-Signature",
+          "algo": "hmac-sha256",
+          "prefix": "sha256="
+        }
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "event": {
+            "type": "string"
+          },
+          "container": {
+            "type": "string"
+          },
+          "node": {
+            "type": "string"
+          },
+          "exitCode": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "sample": {
+        "event": "restart",
+        "container": "helpdesk-web",
+        "node": "node-1",
+        "exitCode": 137,
+        "at": "2026-09-17T14:02:11Z"
+      }
+    },
+    {
+      "id": "deploy.finished",
+      "name": "Déploiement terminé",
+      "description": "Une stack a fini d'être déployée ou mise à jour, avec succès ou non.",
+      "icon": "server",
+      "group": "Stacks",
+      "params": [
+        {
+          "key": "status",
+          "label": "Statut",
+          "type": "select",
+          "options": [
+            "success",
+            "failure",
+            "any"
+          ],
+          "default": "any"
+        }
+      ],
+      "delivery": {
+        "type": "poll",
+        "request": {
+          "method": "GET",
+          "path": "/deployments",
+          "query": {
+            "since": "{{state.cursor}}",
+            "status": "{{params.status}}"
+          }
+        },
+        "interval": "30s",
+        "items": "$.items",
+        "dedupeKey": "$.id",
+        "cursor": "$.lastTimestamp"
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "durationMs": {
+            "type": "integer"
+          }
+        }
+      },
+      "sample": {
+        "id": "dep_4821",
+        "stack": "helpdesk",
+        "status": "success",
+        "durationMs": 18240
+      }
+    }
+  ],
+  "actions": [
+    {
+      "id": "container.list",
+      "name": "Lister les conteneurs",
+      "description": "Retourne les conteneurs d'un nœud ou de tous les nœuds.",
+      "icon": "server",
+      "group": "Conteneurs",
+      "params": [
+        {
+          "key": "node",
+          "label": "Nœud",
+          "type": "node-ref",
+          "default": "*"
+        },
+        {
+          "key": "state",
+          "label": "État",
+          "type": "select",
+          "options": [
+            "all",
+            "running",
+            "exited"
+          ],
+          "default": "all"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/containers",
+        "query": {
+          "node": "{{params.node}}",
+          "state": "{{params.state}}"
+        },
+        "select": "$.items"
+      },
+      "risk": "read",
+      "idempotent": true,
+      "output": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "image": {
+              "type": "string"
+            },
+            "node": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "sample": [
+        {
+          "name": "helpdesk-web",
+          "state": "running",
+          "image": "helpdesk:2.4.1",
+          "node": "node-1"
+        }
+      ]
+    },
+    {
+      "id": "container.logs",
+      "name": "Lire les logs",
+      "description": "Les dernières lignes de log d'un conteneur.",
+      "icon": "logs",
+      "group": "Conteneurs",
+      "params": [
+        {
+          "key": "container",
+          "label": "Conteneur",
+          "type": "container-ref",
+          "required": true
+        },
+        {
+          "key": "lines",
+          "label": "Lignes",
+          "type": "integer",
+          "default": 200,
+          "min": 1,
+          "max": 5000
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/containers/{{params.container}}/logs",
+        "query": {
+          "tail": "{{params.lines}}"
+        }
+      },
+      "risk": "read",
+      "idempotent": true,
+      "output": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "sample": {
+        "lines": [
+          "Killed process 4112 (node) total-vm:612MB"
+        ]
+      }
+    },
+    {
+      "id": "container.restart",
+      "name": "Redémarrer un conteneur",
+      "description": "Redémarre le conteneur choisi.",
+      "icon": "refresh",
+      "group": "Conteneurs",
+      "capability": "containers.control",
+      "params": [
+        {
+          "key": "container",
+          "label": "Conteneur",
+          "type": "container-ref",
+          "required": true
+        },
+        {
+          "key": "timeout",
+          "label": "Délai d'arrêt",
+          "type": "duration",
+          "default": "10s",
+          "advanced": true
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/containers/{{params.container}}/restart",
+        "body": {
+          "timeout": "{{params.timeout}}"
+        }
+      },
+      "risk": "reversible",
+      "timeout": "60s",
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
+      "sample": {
+        "ok": true,
+        "state": "running"
+      }
+    },
+    {
+      "id": "container.set-limits",
+      "name": "Changer les limites",
+      "description": "Modifie la limite mémoire et CPU d'un conteneur.",
+      "icon": "chip",
+      "group": "Conteneurs",
+      "params": [
+        {
+          "key": "container",
+          "label": "Conteneur",
+          "type": "container-ref",
+          "required": true
+        },
+        {
+          "key": "memory",
+          "label": "Mémoire",
+          "type": "string",
+          "pattern": "^\\d+[mg]$",
+          "default": "512m"
+        },
+        {
+          "key": "cpus",
+          "label": "CPU",
+          "type": "number",
+          "min": 0.1,
+          "default": 1
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "path": "/containers/{{params.container}}/limits",
+        "body": {
+          "memory": "{{params.memory}}",
+          "cpus": "{{params.cpus}}"
+        }
+      },
+      "risk": "reversible",
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "sample": {
+        "ok": true
+      }
+    },
+    {
+      "id": "stack.update",
+      "name": "Mettre à jour une stack",
+      "description": "Tire les nouvelles images et recrée la stack.",
+      "icon": "refresh",
+      "group": "Stacks",
+      "params": [
+        {
+          "key": "stack",
+          "label": "Stack",
+          "type": "select",
+          "required": true,
+          "optionsFrom": {
+            "method": "GET",
+            "path": "/stacks",
+            "select": "$.items",
+            "map": {
+              "value": "$.name",
+              "label": "$.name"
+            }
+          }
+        },
+        {
+          "key": "backup",
+          "label": "Sauvegarder avant",
+          "type": "boolean",
+          "default": true
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/stacks/{{params.stack}}/update",
+        "body": {
+          "backup": "{{params.backup}}"
+        }
+      },
+      "risk": "reversible",
+      "timeout": "10m",
+      "output": {
+        "type": "object",
+        "properties": {
+          "deploymentId": {
+            "type": "string"
+          }
+        }
+      },
+      "sample": {
+        "deploymentId": "dep_4822"
+      }
+    },
+    {
+      "id": "container.remove",
+      "name": "Supprimer un conteneur",
+      "description": "Arrête et supprime un conteneur. Les volumes nommés sont conservés.",
+      "icon": "stop",
+      "group": "Conteneurs",
+      "params": [
+        {
+          "key": "container",
+          "label": "Conteneur",
+          "type": "container-ref",
+          "required": true
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "path": "/containers/{{params.container}}"
+      },
+      "risk": "destructive",
+      "output": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "sample": {
+        "ok": true
+      }
+    }
+  ],
+  "probes": [
+    {
+      "id": "container.state",
+      "name": "État des conteneurs",
+      "kind": "state",
+      "request": {
+        "method": "GET",
+        "path": "/containers",
+        "select": "$.items"
+      },
+      "value": "$.state",
+      "labels": {
+        "container": "$.name",
+        "node": "$.node"
+      },
+      "states": {
+        "ok": [
+          "running"
+        ],
+        "warn": [
+          "restarting",
+          "paused"
+        ],
+        "crit": [
+          "exited",
+          "dead"
+        ]
+      },
+      "interval": "30s"
+    },
+    {
+      "id": "container.memory",
+      "name": "Mémoire par conteneur",
+      "kind": "gauge",
+      "unit": "%",
+      "request": {
+        "method": "GET",
+        "path": "/metrics/containers"
+      },
+      "value": "$.memoryPercent",
+      "labels": {
+        "container": "$.name"
+      },
+      "thresholds": {
+        "warn": 80,
+        "crit": 95,
+        "direction": "above"
+      },
+      "interval": "30s"
+    },
+    {
+      "id": "container.restarts",
+      "name": "Redémarrages",
+      "kind": "counter",
+      "request": {
+        "method": "GET",
+        "path": "/metrics/containers"
+      },
+      "value": "$.restartCount",
+      "labels": {
+        "container": "$.name"
+      },
+      "interval": "1m"
+    },
+    {
+      "id": "node.agents",
+      "name": "Agents connectés",
+      "kind": "gauge",
+      "request": {
+        "method": "GET",
+        "path": "/nodes"
+      },
+      "value": "$.connected",
+      "thresholds": {
+        "warn": 1,
+        "crit": 0,
+        "direction": "below"
+      },
+      "interval": "1m"
+    }
+  ],
+  "autoWorkflows": [
+    {
+      "id": "events-to-memory",
+      "name": "Événements conteneurs vers la mémoire",
+      "when": "memory.ingest",
+      "steps": [
+        {
+          "use": "trigger:container.event",
+          "params": {
+            "events": [
+              "restart",
+              "die",
+              "oom",
+              "health_unhealthy"
+            ]
+          }
+        },
+        {
+          "use": "core:set-fields",
+          "params": {
+            "text": "{{ $json.container }} : {{ $json.event }} sur {{ $json.node }} (code {{ $json.exitCode }})",
+            "tags": [
+              "incident",
+              "docker"
+            ]
+          }
+        },
+        {
+          "use": "capability:memory.ingest",
+          "params": {
+            "space": "shared"
+          }
+        }
+      ]
+    }
+  ],
+  "permissions": {
+    "dockerSocket": "proxy",
+    "privileged": false,
+    "hostNetwork": false,
+    "egress": []
+  },
+  "ai": {
+    "exposeActions": true,
+    "hints": "Un code de sortie 137 signale presque toujours un manque de mémoire : lire les logs et la sonde container.memory avant de proposer container.set-limits. Ne jamais proposer container.remove pour résoudre un incident."
+  }
+}
