@@ -2,7 +2,7 @@
 # Hub — image de production. Node 24 (Argon2id natif), aucune dépendance npm.
 # L'image de base est épinglée par empreinte (index multi-architecture) : une
 # étiquette peut être déplacée, une empreinte non.
-ARG NODE_IMAGE=node:24.21.0-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1
+ARG NODE_IMAGE=node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
 
 # Renouvellement du certificat HTTPS local (conteneur hub-certificat) : openssl
 # seul, hors de l'image du Hub, qui n'en a pas besoin.
@@ -11,6 +11,9 @@ RUN apk add --no-cache openssl
 
 # Compteurs de la machine (conteneur hub-mesure) : sh et /proc, rien d'autre.
 FROM ${NODE_IMAGE} AS mesure
+# Paquets du système à jour, et pas de npm, npx, corepack ni yarn : le service
+# n'a aucune dépendance npm, ils n'ont rien à faire dans l'image.
+RUN apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 RUN addgroup -S -g 1001 hub && adduser -S -G hub -u 1001 hub \
  && mkdir -p /run/mesure && chown hub:hub /run/mesure
 COPY outils/mesure-hote.sh /opt/mesure-hote.sh
@@ -36,6 +39,9 @@ EXPOSE 7110
 CMD ["node", "/opt/pont.mjs"]
 
 FROM ${NODE_IMAGE} AS hub
+# Paquets du système à jour, et pas de npm, npx, corepack ni yarn : le service
+# n'a aucune dépendance npm, ils n'ont rien à faire dans l'image.
+RUN apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 
 # CLI docker + plugin compose : le Hub pilote Docker par le proxy de socket
 # (DOCKER_HOST), jamais par le socket lui-même. Même utilisateur qu'avant
