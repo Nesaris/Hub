@@ -76,7 +76,8 @@ jobs:
           auteurs=$(git log --format='%an <%ae>%n%cn <%ce>' "$plage" | sort -u)
           echo "$auteurs"
           if [ -n "$auteurs" ] && [ "$(printf '%s\n' "$auteurs" | wc -l)" -ne 1 ]; then echo "plusieurs identités"; exit 1; fi
-          if git log --format='%aI%n%cI' "$plage" | grep -v '+00:00$'; then echo "fuseau autre que UTC"; exit 1; fi
+          # UTC s'écrit « +00:00 » ou « Z » selon la version de git.
+          if git log --format='%aI%n%cI' "$plage" | grep -vE '(\+00:00|Z)$'; then echo "fuseau autre que UTC"; exit 1; fi
           if git log --format='%B' "$plage" | grep -inE 'co-authored-by|generated (by|with)|as an ai|🤖|claude\.ai/code|session_[0-9A-Za-z]{10,}'; then echo "mention d'outil"; exit 1; fi
 
   # Les motifs viennent d'un secret du dépôt, jamais du dépôt lui-même : la
@@ -98,10 +99,14 @@ jobs:
           APRES: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           if [ -z "$LISTE" ]; then echo "Secret LISTE_ANONYMAT absent : contrôle impossible, refusé."; exit 1; fi
-          sans_casse=$(mktemp); casse=$(mktemp)
-          printf '%s\n' "$LISTE" | sed '/^[[:space:]]*$/d' | grep -v '^=' > "$sans_casse" || true
+          # Une ligne par terme : tel quel, sans tenir compte de la casse ;
+          # « =terme » en respectant la casse ; « ~terme » en mot entier
+          # (un mot courant qui se retrouve dans d'autres mots).
+          sans_casse=$(mktemp); casse=$(mktemp); mots=$(mktemp)
+          printf '%s\n' "$LISTE" | sed '/^[[:space:]]*$/d' | grep -v '^[=~]' > "$sans_casse" || true
           printf '%s\n' "$LISTE" | sed -n 's/^=//p' | sed '/^[[:space:]]*$/d' > "$casse" || true
-          cherche() { t=$(mktemp); cat > "$t"; { [ -s "$sans_casse" ] && grep -qiF -f "$sans_casse" "$t"; } || { [ -s "$casse" ] && grep -qF -f "$casse" "$t"; }; }
+          printf '%s\n' "$LISTE" | sed -n 's/^~//p' | sed '/^[[:space:]]*$/d' > "$mots" || true
+          cherche() { t=$(mktemp); cat > "$t"; { [ -s "$sans_casse" ] && grep -qiF -f "$sans_casse" "$t"; } || { [ -s "$casse" ] && grep -qF -f "$casse" "$t"; } || { [ -s "$mots" ] && grep -qiwF -f "$mots" "$t"; }; }
           if git grep -hI -e '' -- . | cherche; then echo "Un terme de la liste figure dans l'arbre."; exit 1; fi
           if ! git cat-file -e "$AVANT^{commit}" 2>/dev/null; then AVANT=$(git rev-list --max-parents=0 "$APRES" | tail -n 1); fi
           # Les lignes ajoutées et les métadonnées seulement : retirer un terme ne doit pas faire échouer le contrôle.
