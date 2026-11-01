@@ -6,7 +6,7 @@
 # voix restent sur le réseau interne de la pile, la gateway les relaie.
 services:
   gateway:
-    image: ghcr.io/codexx64/vox-gateway:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/vox-gateway:{{config.IMAGE_TAG}}
     container_name: {{service.host}}
     restart: unless-stopped
     networks: [hub, vox]
@@ -52,7 +52,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   stt:
-    image: ghcr.io/codexx64/vox-stt:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/vox-stt:{{config.IMAGE_TAG}}
     container_name: {{service.host}}-stt
     restart: unless-stopped
     networks: [vox]
@@ -82,7 +82,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   tts:
-    image: ghcr.io/codexx64/vox-tts:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/vox-tts:{{config.IMAGE_TAG}}
     container_name: {{service.host}}-tts
     restart: unless-stopped
     networks: [vox]

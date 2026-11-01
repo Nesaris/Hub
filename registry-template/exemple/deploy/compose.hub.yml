@@ -11,7 +11,7 @@
 # (permissions.hostNetwork) et cap_add (permissions.capAdd).
 services:
   app:
-    image: ghcr.io/codexx64/exemple:1.0.0
+    image: ghcr.io/nesaris/exemple:1.0.0
     container_name: {{service.host}}
     restart: unless-stopped
     environment:

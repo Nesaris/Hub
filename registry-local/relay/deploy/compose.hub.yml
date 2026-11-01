@@ -5,7 +5,7 @@
 # partagé du Hub, où Caddy joint chaque service par son nom de conteneur.
 services:
   caddy:
-    image: ghcr.io/codexx64/relay-caddy:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/relay-caddy:{{config.IMAGE_TAG}}
     container_name: {{service.host}}-caddy
     restart: unless-stopped
     # hub : les services qu'il sert ; tunnel : le seul chemin du connecteur Cloudflare.
@@ -42,7 +42,7 @@ services:
   # locale (home.arpa) mènent à cette machine, le reste est transmis. Il n'écoute que sur l'adresse de la machine : pose-le comme
   # DNS de la zone sur tes postes (/etc/resolver sur Mac) ou sur la box.
   dns:
-    image: ghcr.io/codexx64/relay-dns:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/relay-dns:{{config.IMAGE_TAG}}
     container_name: {{service.host}}-dns
     restart: unless-stopped
     networks: [hub]
@@ -67,7 +67,7 @@ services:
         max-file: "3"
 
   relay:
-    image: ghcr.io/codexx64/relay:{{config.IMAGE_TAG}}
+    image: ghcr.io/nesaris/relay:{{config.IMAGE_TAG}}
     container_name: {{service.host}}
     restart: unless-stopped
     depends_on: [caddy]
