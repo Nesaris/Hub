@@ -490,3 +490,7 @@ Aucun contrôle ne change de statut ; aucun changement de comportement du servic
 - images publiées sous ghcr.io/nesaris.
 
 Contrôles rejoués avant livraison : gitleaks sur tout l'historique (aucune fuite), identité et fuseau des nouveaux commits (CodexX64, UTC, aucune mention d'outil), liste d'anonymat sur l'arbre et les nouveaux commits (aucune correspondance).
+
+## Suivi du 2026-11-02 (0.15.2) : réglages détectés par l’assistant (socle 9f1d3f8)
+
+Aucun contrôle ne change de statut. L’assistant (administrateur seulement, `GET /api/compte/reglages`) propose deux valeurs sans jamais les poser : le relais de confiance, reconnu à une requête qui porte un en-tête de transfert (X-Forwarded-For, X-Forwarded-Proto, Forwarded, Via) et vient d’une adresse privée — la plage Docker 172.16.0.0/12 pour un relais en conteneur, sinon son adresse seule ; une adresse publique n’est jamais proposée (`socle/src/http.js`, relaisVu) ; et l’adresse publique, prise par le navigateur sur l’adresse ouverte, seulement pour un nom (ni adresse IP ni localhost). Une valeur déjà posée n’est jamais remplacée ; la proposition passe par la même validation que toute saisie et l’administrateur la confirme. Essais : 218 du Hub, 93 du socle (dont relais proposé, jamais posé, et filtre des adresses publiques).
