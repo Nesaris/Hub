@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.15.2",
+    "date": "2026-11-02",
+    "points": [
+      "L’assistant de configuration remplit seul l’adresse publique et le relais de confiance quand il les voit : il ne reste qu’à vérifier."
+    ]
+  },
+  {
     "version": "0.15.1",
     "date": "2026-11-01",
     "points": [
