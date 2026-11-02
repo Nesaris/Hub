@@ -6,7 +6,7 @@
 //   if (await portail.traiter(req, res, url, ctx)) return;
 //   portail.exiger(ctx, { role: 'admin' });   // avant chaque route protégée
 import net from 'node:net';
-import { Debit, adresseClient, estSecurise, hoteLocal, lireCookies, lireCorps, origineDe, poseCookie, repondreJson } from './http.js';
+import { Debit, adresseClient, estSecurise, hoteLocal, lireCookies, lireCorps, origineDe, poseCookie, relaisVu, repondreJson } from './http.js';
 import { valider } from './schema.js';
 import { ErreurHttp, aleatoire, egal, sha256hex } from './outils.js';
 import { ROLES, NIVEAUX } from './comptes.js';
@@ -215,7 +215,11 @@ export class Portail {
     // --- assistant de configuration : administrateurs seulement ---
     if (p === '/api/compte/reglages' && this.assistant) {
       const s = this.sessionAdmin(ctx);
-      if (m === 'GET') return this.assistant.public();
+      if (m === 'GET') {
+        // Le relais devant le service se reconnaît à cette requête même : proposé, pas posé.
+        const relais = relaisVu(ctx.req);
+        return this.assistant.public({ detecte: relais ? { SOCLE_PROXYS: relais } : {} });
+      }
       if (m === 'POST') {
         const b = await this.corps(ctx, { valeurs: { type: 'objet', requis: true, profondeur: 1 } });
         // Après la première configuration, changer un réglage touche au service entier.

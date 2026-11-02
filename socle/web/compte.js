@@ -310,9 +310,20 @@ export function appliquerTheme() {
 // Un champ par réglage, selon son type. valeurs() ne rend que ce qui a changé
 // (un texte vide efface, un secret laissé vide est gardé).
 const VRAI = ['1', 'true', 'oui'];
+// L'adresse par laquelle le navigateur a ouvert le service, quand c'est un nom
+// (jamais une adresse IP ni localhost) : l'adresse publique à proposer.
+function adresseVue() {
+  const h = location.hostname;
+  if (!h || h === 'localhost' || /^[\d.]+$/.test(h) || h.includes(':')) return null;
+  return location.origin;
+}
+
 export function formulaireReglages(reglages) {
   const lignes = new Map();
   const noeuds = reglages.map(r => {
+    // Proposé, pas posé : la valeur part avec le reste si l'administrateur valide.
+    const detecte = r.source === 'defaut' && !r.valeur && r.type !== 'secret'
+      ? (r.detecte || (r.env === 'SOCLE_URL_PUBLIQUE' ? adresseVue() : null)) : null;
     const id = `reglage-${++champs}`;
     const err = h('p', { class: 'erreur', role: 'alert' });
     let input, lire, initial;
@@ -331,7 +342,7 @@ export function formulaireReglages(reglages) {
       input = h('input', { class: 'field', id, type: 'password', autocomplete: 'new-password', placeholder: r.pose ? 'Déjà posé — vide pour le garder' : (r.exemple ? `ex. ${r.exemple}` : '') });
       initial = ''; lire = () => input.value;
     } else {
-      input = h('input', { class: 'field' + (['url', 'liste', 'chaine'].includes(r.type) ? ' mono' : ''), id, type: r.type === 'entier' ? 'number' : 'text', value: r.valeur ?? '',
+      input = h('input', { class: 'field' + (['url', 'liste', 'chaine'].includes(r.type) ? ' mono' : ''), id, type: r.type === 'entier' ? 'number' : 'text', value: detecte || (r.valeur ?? ''),
         placeholder: r.exemple ? `ex. ${r.exemple}` : '', spellcheck: false, autocapitalize: 'none', ...(r.min !== null && r.min !== undefined ? { min: r.min } : {}), ...(r.max !== null && r.max !== undefined ? { max: r.max } : {}) });
       initial = r.valeur ?? ''; lire = () => input.value.trim();
     }
@@ -340,7 +351,8 @@ export function formulaireReglages(reglages) {
       ? h('button', { class: 'lnk', type: 'button', text: 'Retirer', onclick: ev => { effacer = !effacer; input.value = ''; input.disabled = effacer; ev.target.textContent = effacer ? 'Garder' : 'Retirer'; } }) : null;
     lignes.set(r.env, { lire, initial, err, input, secret: r.type === 'secret', effacer: () => effacer });
     const tete = h('span', { class: 'lbl' }, r.libelle, r.requis ? h('span', { class: 'req', text: ' *', 'aria-label': 'obligatoire' }) : null,
-      r.nouveau && r.depuis ? h('span', { class: 'chip a nouveau', text: `nouveau · ${r.depuis}` }) : null);
+      r.nouveau && r.depuis ? h('span', { class: 'chip a nouveau', text: `nouveau · ${r.depuis}` }) : null,
+      detecte ? h('span', { class: 'chip detecte', text: 'détecté', title: 'Vu sur cette connexion : vérifie, puis valide' }) : null);
     return r.type === 'booleen'
       ? h('div', { class: 'champ reglage' }, h('label', { class: 'case', for: id }, input, tete), r.aide ? h('p', { class: 'hint', text: r.aide }) : null, err)
       : h('label', { class: 'champ reglage', for: id }, tete, input, retirer, r.aide ? h('p', { class: 'hint', text: r.aide }) : null, err);

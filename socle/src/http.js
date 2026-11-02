@@ -38,6 +38,21 @@ export function adresseClient(req, bl) {
   return a;
 }
 
+// Un relais inverse devant le service, reconnu à ses en-têtes de transfert :
+// son adresse, ou la plage des réseaux Docker quand il tourne dans un
+// conteneur (son adresse y change à chaque recréation). Une proposition pour
+// l'assistant, jamais appliquée seule : seule une adresse privée est proposée,
+// un visiteur d'Internet ne peut pas se faire passer pour le relais.
+const PRIVEES = listeConfiance(['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '127.0.0.0/8', '::1/128', 'fc00::/7']);
+const DOCKER = listeConfiance(['172.16.0.0/12']);
+export function relaisVu(req) {
+  const h = req.headers;
+  if (!h['x-forwarded-for'] && !h['x-forwarded-proto'] && !h.forwarded && !h.via) return null;
+  const a = nue(req.socket.remoteAddress);
+  if (!net.isIP(a) || !deConfiance(PRIVEES, a)) return null;
+  return deConfiance(DOCKER, a) ? '172.16.0.0/12' : a;
+}
+
 export function estSecurise(req, bl) {
   if (req.socket.encrypted) return true;
   return !!bl && deConfiance(bl, req.socket.remoteAddress) && String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';

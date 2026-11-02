@@ -214,3 +214,36 @@ test('nouveautés : une fois par compte et par version, rien sur une installatio
   assert.equal(n.pour('x', { cree: 0, maintenant: Date.now() }).versions[0].version, '1.2.0');
   assert.equal(n.pour('x', { cree: Date.now() - 1000, maintenant: Date.now() }), null);
 });
+
+test('relais devant le service : reconnu à ses en-têtes et proposé, jamais posé seul', async () => {
+  const s = await monterBanc({ assistant: { reglages: V1, spec: SPEC, version: '1.0.0', redemarrer: null } });
+  try {
+    const admin = s.client();
+    await adminComplet(admin, { jeton: s.jeton, maintenant: () => s.horloge.t, terminer: false });
+    const proxys = r => r.json.reglages.find(x => x.env === 'SOCLE_PROXYS');
+    // Sans en-tête de transfert : rien à proposer.
+    let r = await admin.get('/api/compte/reglages');
+    assert.equal(proxys(r).detecte, undefined);
+    // Par un relais sur la même machine (le banc écoute en 127.0.0.1) : son adresse.
+    r = await admin.get('/api/compte/reglages', { entetes: { 'x-forwarded-for': '203.0.113.9', 'x-forwarded-proto': 'https' } });
+    assert.equal(proxys(r).detecte, '127.0.0.1');
+    assert.equal(proxys(r).valeur, '', 'proposé seulement : rien n’est posé');
+    // Une valeur déjà choisie n'est jamais remplacée par une proposition.
+    assert.equal((await admin.post('/api/compte/reglages', { valeurs: { SOCLE_PROXYS: '10.0.0.5' } })).status, 200);
+    r = await admin.get('/api/compte/reglages', { entetes: { 'x-forwarded-for': '203.0.113.9' } });
+    assert.equal(proxys(r).detecte, undefined);
+    assert.equal(proxys(r).valeur, '10.0.0.5');
+  } finally { await s.fermer(); }
+});
+
+test('relaisVu : adresse privée seulement, plage Docker pour un relais en conteneur', async () => {
+  const { relaisVu } = await import('../src/http.js');
+  const req = (adresse, entetes = { 'x-forwarded-for': '198.51.100.7' }) => ({ headers: entetes, socket: { remoteAddress: adresse } });
+  assert.equal(relaisVu(req('172.18.0.5')), '172.16.0.0/12');
+  assert.equal(relaisVu(req('::ffff:172.20.3.4')), '172.16.0.0/12');
+  assert.equal(relaisVu(req('10.0.5.2')), '10.0.5.2');
+  assert.equal(relaisVu(req('192.168.1.20', { via: '1.1 caddy' })), '192.168.1.20');
+  assert.equal(relaisVu(req('::1', { forwarded: 'for=198.51.100.7' })), '::1');
+  assert.equal(relaisVu(req('198.51.100.7')), null, 'une adresse publique n’est jamais proposée');
+  assert.equal(relaisVu(req('172.18.0.5', {})), null, 'sans en-tête de transfert, pas de relais');
+});

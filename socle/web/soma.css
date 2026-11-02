@@ -484,7 +484,7 @@ textarea.field{min-height:90px;resize:vertical;line-height:1.5}
 .champ.reglage .lnk{margin-top:6px}
 .champ.reglage .erreur:empty{display:none}
 .champ .req{color:var(--alarm)}
-.chip.nouveau{font-size:10.5px;padding:2px 8px}
+.chip.nouveau,.chip.detecte{font-size:10.5px;padding:2px 8px}
 .case{display:flex;align-items:center;gap:10px;cursor:pointer}
 .case input{width:18px;height:18px;accent-color:var(--accent);flex:none}
 .field.fige{color:var(--muted);background:transparent;border-style:dashed;overflow-wrap:anywhere}

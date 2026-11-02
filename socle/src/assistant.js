@@ -183,7 +183,9 @@ export class Assistant {
   }
 
   // Pour l'écran : jamais la valeur d'un secret, seulement s'il est posé.
-  public() {
+  // detecte : { VARIABLE: valeur } vue sur la requête (relais devant le
+  // service…), proposée seulement pour un réglage resté à son défaut.
+  public({ detecte = {} } = {}) {
     const etat = this.etat();
     const attente = new Set(this.enAttente(etat).map(r => r.env));
     return {
@@ -201,6 +203,7 @@ export class Assistant {
           ...(s.type === 'choix' ? { parmi: s.parmi.filter(v => v !== '' || !r.requis).map(v => ({ valeur: v, nom: r.noms?.[v] ?? (v === '' ? '—' : v) })) } : {}),
           ...(s.type === 'entier' ? { min: s.min ?? null, max: s.max ?? null } : {}),
           source, ...(secret ? { pose: source !== 'defaut' } : { valeur }),
+          ...(!secret && source === 'defaut' && !valeur && detecte[r.env] ? { detecte: detecte[r.env] } : {}),
         };
       }),
     };
