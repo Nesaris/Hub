@@ -160,6 +160,7 @@ export class Registry {
     }
     this.vus = null;
     this.commits = null;
+    try { await this.suivreDemenagements(actor); } catch (err) { log.warn('registre', 'dépôts déplacés', err.message); }
     this.db.setSetting('registry_refreshed', Date.now());
     this.bus.emit('catalog', { count, retires });
     if (actor !== 'hub' || retires.length) this.audit.write(actor, 'catalogue.actualisé', null, { count, erreurs: this.errors.length, ...(retires.length ? { retires } : {}) });
@@ -205,6 +206,45 @@ export class Registry {
       } catch (err) { this.errors.push({ source: src.label, id: r.name, error: err.message }); log.warn('registre', src.label, r.name, err.message); }
     }
     return { count, complet };
+  }
+
+  /**
+   * Un dépôt déplacé ou renommé sur GitHub (compte passé à une organisation,
+   * nouveau nom) : l'entrée d'un service installé, venue d'un registre que le
+   * Hub ne lit plus, rejoint le registre où vit désormais son dépôt. GitHub en
+   * fait la preuve : l'ancienne adresse du dépôt mène à la nouvelle, et seul
+   * son propriétaire peut le transférer ou le renommer. Le service peut alors
+   * passer à l'extension qui le remplace (même registre, `replaces`), comme
+   * avant le déménagement. Rien n'est déplacé sans cette preuve.
+   */
+  async suivreDemenagements(actor = 'hub') {
+    const lues = new Set(this.sources());
+    const lignes = this.db.all('SELECT id, source, origin FROM catalog');
+    const origine = l => { try { const o = JSON.parse(l.origin); return o?.type === 'github' && o.repo ? o : null; } catch { return null; } };
+    const parDepot = new Map();
+    for (const l of lignes) { const o = origine(l); if (o && lues.has(l.source)) parDepot.set(o.repo.toLowerCase(), l.source); }
+    let n = 0;
+    for (const l of lignes) {
+      if (l.source === 'import' || lues.has(l.source)) continue;
+      const o = origine(l);
+      if (!o) continue;
+      const actuel = await this.depotActuel(o.repo).catch(() => null);
+      const cible = actuel && actuel.toLowerCase() !== o.repo.toLowerCase() ? parDepot.get(actuel.toLowerCase()) : null;
+      if (!cible) continue;
+      this.db.run('UPDATE catalog SET source=? WHERE id=? AND source=?', cible, l.id, l.source);
+      this.audit?.write(actor, 'catalogue.dépôt_déplacé', l.id, { de: `${l.source} (${o.repo})`, vers: `${cible} (${actuel})` });
+      n++;
+    }
+    return n;
+  }
+
+  /** Le nom actuel d'un dépôt GitHub (propriétaire/nom), redirections de renommage et de transfert suivies ; null s'il n'existe plus. */
+  async depotActuel(repo) {
+    if (!/^[\w.-]{1,39}\/[\w.-]{1,100}$/.test(repo)) return null;
+    const res = await sortir(`https://api.github.com/repos/${repo}`, { headers: { accept: 'application/vnd.github+json', 'user-agent': 'hub' }, signal: AbortSignal.timeout(20000) });
+    if (!res.ok) { await res.body?.cancel(); return null; }
+    const d = await res.json();
+    return typeof d?.full_name === 'string' && /^[\w.-]{1,39}\/[\w.-]{1,100}$/.test(d.full_name) ? d.full_name : null;
   }
 
   /**

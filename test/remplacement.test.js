@@ -25,6 +25,43 @@ const manifeste = (id, name, version, extra = {}) => ({
 const ANCIEN = manifeste('oracle', 'Oracle AI', '2.1.0');
 const NOUVEAU = manifeste('dialekt', 'DIALEKT', '2.2.1', { replaces: [{ id: 'oracle', config: { ORACLE_DUELS_JOUR: 'DIALEKT_DUELS_JOUR' } }] });
 
+test('compte déplacé sur GitHub : le service installé suit son dépôt, seulement si GitHub le confirme', async () => {
+  const { configurer } = await import('../server/sortie.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-demenage-'));
+  const db = openDb(path.join(dir, 'h.db'));
+  db.setSetting('registries', ['github-user:Nouveau']);
+  const ligne = (m, source, repo) => db.run('INSERT INTO catalog(id,source,version,manifest,origin,fetched) VALUES(?,?,?,?,?,?)', m.id, source, m.version, JSON.stringify(m), JSON.stringify({ type: 'github', repo, ref: 'main' }), 1);
+  ligne(ANCIEN, 'github-user:ancien', 'ancien/oracle');
+  ligne(NOUVEAU, 'github-user:Nouveau', 'Nouveau/Dialekt');
+  ligne(manifeste('perdu', 'Perdu', '1.0.0'), 'github-user:ancien', 'ancien/perdu');
+  ligne({ ...NOUVEAU, id: 'pirate', replaces: [{ id: 'usurpe' }] }, 'github-user:Nouveau', 'Nouveau/Pirate');
+  ligne(manifeste('usurpe', 'Usurpé', '1.0.0'), 'github-user:autre', 'autre/usurpe');
+  const appels = [];
+  const audits = [];
+  configurer({ transport: async url => {
+    const u = String(url); appels.push(u);
+    // L'ancienne adresse de ce dépôt mène à la nouvelle (renommage + transfert).
+    if (u === 'https://api.github.com/repos/ancien/oracle') return new Response('', { status: 301, headers: { location: 'https://api.github.com/repositories/42' } });
+    if (u === 'https://api.github.com/repositories/42') return new Response(JSON.stringify({ id: 42, full_name: 'Nouveau/Dialekt' }), { status: 200 });
+    // Un dépôt toujours chez son propriétaire : rien ne le relie au remplaçant.
+    if (u === 'https://api.github.com/repos/autre/usurpe') return new Response(JSON.stringify({ full_name: 'autre/usurpe' }), { status: 200 });
+    return new Response('{}', { status: 404 });
+  } });
+  const reg = new Registry({ db, audit: { write: (...a) => audits.push(a) }, bus: { emit() {} } });
+  try {
+    assert.equal(reg.remplacantDe('oracle'), null, 'avant : deux registres différents');
+    assert.equal(await reg.suivreDemenagements('ana'), 1);
+    assert.equal(db.get('SELECT source FROM catalog WHERE id=?', 'oracle').source, 'github-user:Nouveau');
+    assert.equal(reg.remplacantDe('oracle').id, 'dialekt', 'proposé de nouveau comme mise à jour');
+    assert.equal(db.get('SELECT source FROM catalog WHERE id=?', 'perdu').source, 'github-user:ancien', 'dépôt disparu : rien ne bouge');
+    assert.equal(db.get('SELECT source FROM catalog WHERE id=?', 'usurpe').source, 'github-user:autre', 'pas de preuve de GitHub : rien ne bouge');
+    assert.equal(reg.remplacantDe('usurpe'), null, 'un autre registre ne prend toujours pas un service qui n’est pas à lui');
+    assert.ok(audits.some(a => a[1] === 'catalogue.dépôt_déplacé' && a[2] === 'oracle'), 'journalisé');
+    assert.ok(appels.every(u => u.startsWith('https://api.github.com/')), 'aucune autre sortie');
+    assert.equal(await reg.suivreDemenagements('ana'), 0, 'une seule fois');
+  } finally { configurer({ transport: null }); db.close?.(); }
+});
+
 test('manifeste : « replaces » se valide, et reste borné', () => {
   const valider = createValidator(schema);
   assert.deepEqual(valider(NOUVEAU).errors, []);
