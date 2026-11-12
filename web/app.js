@@ -3,6 +3,7 @@
 // revérifie chaque droit.
 import { porte, pageSecurite, pageComptes, basculeTheme, appliquerTheme, icone, boutonDevoiler } from '/socle/compte.js';
 import { courbe, jauge, calendrier } from '/socle/graphes.js';
+import { installerDisposition, controleDisposition, choisirDisposition, choixPersonnel, schemaDisposition, LIBELLES_DISPOSITION } from '/socle/disposition.js';
 import { I, P } from './icons.js';
 import { $, $$, html, poser, rendre, element, api, session, GET, POST, PUT, PATCH, DEL, toast, fail, pulse, modal, confirmBox, formulaire, readForm, bindDynamic, when, sparkSvg, statusTag, originChip, ecouterApercu } from './lib.js';
 import { openEditor } from './editor.js';
@@ -220,6 +221,8 @@ function shell() {
     $('.top .menu').onclick = () => cadre.classList.toggle('menu-ouvert');
     $('.voile-rail').onclick = () => cadre.classList.remove('menu-ouvert');
     $('#logout').onclick = async () => { es?.close(); await POST('/api/compte/deconnexion').catch(() => {}); location.hash = ''; location.reload(); };
+    // Le menu se place à gauche, en haut, en bas ou à droite : page Thème, ou appui long dessus puis glisser.
+    installerDisposition({ rail: $('nav.rail', cadre), nomDefaut: 'Celle du Hub' });
   }
   majShell();
 }
@@ -1672,7 +1675,8 @@ async function viewTheme(el, t) {
   if (!alive(t)) return;
   const admin = session.role === 'admin';
   // par : seulement les choix propres ; absent = suit le thème global.
-  const depart = () => ({ commun: th.commun, par: th.mode === 'service' ? { ...th.parService } : {} });
+  const depart = () => ({ commun: th.commun, par: th.mode === 'service' ? { ...th.parService } : {}, disp: th.disposition, dispPar: th.mode === 'service' ? { ...th.dispositionParService } : {} });
+  const nomDisp = d => (LIBELLES_DISPOSITION[d] || d).toLowerCase();
   let choix = depart();
   if (!ongletTheme) ongletTheme = th.mode === 'service' ? 'service' : 'global';
   const nom = g => NOM_GAMME[g] || g;
@@ -1684,13 +1688,16 @@ async function viewTheme(el, t) {
   const changements = () => {
     const avant = depart().par, l = [];
     if (choix.commun !== th.commun) l.push(`Thème global : ${nom(th.commun)} → ${nom(choix.commun)}`);
+    if (choix.disp !== th.disposition) l.push(`Menu : ${nomDisp(th.disposition)} → ${nomDisp(choix.disp)}`);
+    const dispAvant = depart().dispPar;
     for (const x of lignes()) {
       if (avant[x.cle] !== choix.par[x.cle]) l.push(`${x.nom} : ${choix.par[x.cle] ? nom(choix.par[x.cle]) : 'suit le thème global'}`);
+      if (dispAvant[x.cle] !== choix.dispPar[x.cle]) l.push(`Menu de ${x.nom} : ${choix.dispPar[x.cle] ? nomDisp(choix.dispPar[x.cle]) : 'comme le global'}`);
     }
     return l;
   };
-  const lignes = () => [{ cle: 'hub', nom: 'Hub', sous: 'cette interface', suit: true, gammes: th.gammes.map(g => g.id) },
-    ...th.services.map(s => ({ cle: s.id, nom: s.nom, sous: s.name, suit: s.suit, gammes: s.gammes || ['soma', 'console', ...(s.toutes ? ['exploitation'] : [])] }))];
+  const lignes = () => [{ cle: 'hub', nom: 'Hub', sous: 'cette interface', suit: true, place: true, gammes: th.gammes.map(g => g.id) },
+    ...th.services.map(s => ({ cle: s.id, nom: s.nom, sous: s.name, suit: s.suit, place: !!s.place, gammes: s.gammes || ['soma', 'console', ...(s.toutes ? ['exploitation'] : [])] }))];
   // La gamme qu'un service affichera vraiment : SOMA s'il ne connaît pas la sienne.
   const affichee = l => (l.gammes.includes(gammeDe(l.cle)) ? gammeDe(l.cle) : 'soma');
   let resultat = '';
@@ -1712,6 +1719,22 @@ async function viewTheme(el, t) {
         ${enSoma.length ? html`<span class="warn-t">${I('alert', 14)}${enSoma.map(l => l.nom).join(', ')} ${enSoma.length > 1 ? 'restent' : 'reste'} en SOMA : ${nom(choix.commun)} demande une mise à jour de ${enSoma.length > 1 ? 'ces services' : 'ce service'}.</span>` : ''}
         ${gardent.length ? html`<span class="dim">${I('minus', 14)}Gardent leur apparence (ne lisent pas le thème) : ${gardent.map(l => l.nom).join(', ')}</span>` : ''}
       </div>
+    </div>
+    <div class="card">
+      <div class="sec"><span class="itile key">${I('panel')}</span><div class="grow"><h2>Position du menu</h2>
+        <p>Où se tient le menu, dans le Hub et dans les services qui le lisent. Chacun peut encore la changer pour soi : appui long sur le menu, puis glisser vers un bord.</p></div></div>
+      <div class="pad"><div class="choix-disposition" role="radiogroup" aria-label="Position du menu">
+        ${th.dispositions.map(d => html`<button type="button" role="radio" aria-checked=${d.id === choix.disp ? 'true' : 'false'} data-disp=${d.id} disabled=${!admin}>${schemaDisposition(d.id)}<span>${d.label}${d.id === th.disposition ? ' · actuel' : ''}</span></button>`)}
+      </div></div>
+      <div class="theme-portee">
+        <span>${I('check', 14)}La prennent : ${ls.filter(l => l.place && !choix.dispPar[l.cle]).map(l => l.nom).join(', ') || 'aucun'}</span>
+        ${ls.some(l => l.suit && !l.place) ? html`<span class="dim">${I('minus', 14)}Gardent le menu à gauche jusqu’à leur mise à jour : ${ls.filter(l => l.suit && !l.place).map(l => l.nom).join(', ')}</span>` : ''}
+      </div>
+    </div>
+    <div class="card">
+      <div class="sec"><span class="itile key">${I('user')}</span><div class="grow"><h2>Pour toi, sur cet appareil</h2>
+        <p>Ton choix l’emporte sur celui du Hub, dans cette interface et dans ce navigateur seulement.</p></div></div>
+      <div class="pad" id="dispPerso"></div>
     </div>`;
     const ligne = l => {
       const propre = choix.par[l.cle];
@@ -1723,6 +1746,10 @@ async function viewTheme(el, t) {
             const offerte = l.gammes.includes(g.id);
             return html`<button type="button" role="radio" class="theme-puce" aria-checked=${propre === g.id ? 'true' : 'false'} data-cle=${l.cle} data-g=${g.id} disabled=${!admin || !offerte} title=${offerte ? detail[g.id] : `${l.nom} ne connaît pas encore ${nom(g.id)} : à sa prochaine mise à jour`}><i class="pastille" data-g=${g.id}></i>${nom(g.id)}</button>`;
           })}</div>` : html`<span class="chip">inchangé</span>`}
+        ${l.suit || l.place ? html`<div class="theme-choix" role="radiogroup" aria-label=${`Menu de ${l.nom}`}>
+          <button type="button" role="radio" class="theme-puce" aria-checked=${!choix.dispPar[l.cle] ? 'true' : 'false'} data-dcle=${l.cle} data-d="" disabled=${!admin || !l.place} title=${l.place ? 'Comme le global' : `${l.nom} garde le menu à gauche jusqu’à sa mise à jour`}>${schemaDisposition(choix.disp)}Global</button>
+          ${th.dispositions.map(d => html`<button type="button" role="radio" class="theme-puce" aria-checked=${choix.dispPar[l.cle] === d.id ? 'true' : 'false'} data-dcle=${l.cle} data-d=${d.id} disabled=${!admin || !l.place} title=${l.place ? d.label : `${l.nom} garde le menu à gauche jusqu’à sa mise à jour`}>${schemaDisposition(d.id)}${d.label}</button>`)}
+        </div>` : ''}
       </div>`;
     };
     const parService = html`<div class="card">
@@ -1735,16 +1762,22 @@ async function viewTheme(el, t) {
       admin ? html`<div class="theme-barre"><span class="mini" id="themeRes" role="status">${modifie() ? `À appliquer : ${changements().join(' · ')}` : resultat}</span><span class="grow"></span>
         ${modifie() ? html`<button class="btn flat" id="themeAnnuler">Annuler</button>` : ''}<button class="btn solid" id="themeSave" disabled=${!modifie()}>Appliquer</button></div>` : html`<p class="help">Seul un administrateur change le thème.</p>`);
     $$('[data-onglet]', el).forEach(b => { b.onclick = () => { ongletTheme = b.dataset.onglet; peindre(); }; });
+    $('#dispPerso', el)?.append(controleDisposition({ nomDefaut: 'Celle du Hub' }));
     if (!admin) return;
+    $$('[data-disp]', el).forEach(b => { b.onclick = () => { choix.disp = b.dataset.disp; resultat = ''; peindre(); }; });
+    $$('[data-dcle]', el).forEach(b => { b.onclick = () => { if (b.dataset.d) choix.dispPar[b.dataset.dcle] = b.dataset.d; else delete choix.dispPar[b.dataset.dcle]; resultat = ''; peindre(); }; });
     $$('[data-commun]', el).forEach(b => { b.onclick = () => { choix.commun = b.dataset.commun; resultat = ''; peindre(); }; });
     $$('[data-cle]', el).forEach(b => { b.onclick = () => { if (b.dataset.g) choix.par[b.dataset.cle] = b.dataset.g; else delete choix.par[b.dataset.cle]; resultat = ''; peindre(); }; });
     const annuler = $('#themeAnnuler', el);
     if (annuler) annuler.onclick = () => { choix = depart(); resultat = ''; peindre(); };
     $('#themeSave', el).onclick = e => pulse(e.currentTarget, async () => {
-      const par = choix.par;
-      th = await PUT('/api/theme', { mode: Object.keys(par).length ? 'service' : 'commun', commun: choix.commun, parService: par });
+      const par = choix.par, dispPar = choix.dispPar;
+      th = await PUT('/api/theme', { mode: Object.keys(par).length || Object.keys(dispPar).length ? 'service' : 'commun', commun: choix.commun, parService: par, disposition: choix.disp, dispositionParService: dispPar });
       if (!alive(t)) return;
       document.documentElement.dataset.gamme = th.hub;
+      // La nouvelle valeur du Hub ; un choix personnel reste devant.
+      document.documentElement.setAttribute('data-disposition-defaut', th.dispositionHub);
+      choisirDisposition(choixPersonnel());
       choix = depart();
       resultat = th.appliqueA.length ? `Appliqué. Redémarrage de ${th.appliqueA.join(', ')} pour recevoir le thème.` : 'Appliqué.';
       peindre();

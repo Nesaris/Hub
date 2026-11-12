@@ -935,3 +935,6 @@ details.avance .help{margin:8px 0}
 @media (max-width:640px){.flowrow.depot,.flowrow.registre{grid-template-columns:auto minmax(0,1fr)}.flowrow.depot .fin,.flowrow.registre .fin{grid-column:1/-1;justify-content:flex-start}}
 .flowrow.depot .svc-t,.flowrow.registre .svc-t{min-width:0}
 .flowrow.depot .svc-detail{margin-top:4px;font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+/* Position du menu, page Thème : le schéma réduit dans les puces par service. */
+.theme-puce svg{width:22px;height:16px;flex:none}
+.theme-ligne .theme-choix+.theme-choix{margin-top:6px}
