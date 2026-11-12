@@ -33,7 +33,7 @@ const PARAMETRE = /^[\p{L}\p{N}_.:@~ '’-]{1,128}$/u;
 const ECRITURES = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 // tls : { dossier, nom, journal } — le Hub sert alors HTTPS lui-même (tls.js).
-export function createServer({ router, socle, jetons, quotas, webDir, socleWebDir, gamme = () => 'soma', tls = null, apresEcriture = null, version = '' }) {
+export function createServer({ router, socle, jetons, quotas, webDir, socleWebDir, gamme = () => 'soma', disposition = () => 'gauche', tls = null, apresEcriture = null, version = '' }) {
   // Refus par défaut : une route qui écrit sans schéma de corps (schemas.js) arrête le démarrage.
   const sansSchema = router.routes.filter(r => ECRITURES.has(r.methode) && !r.options.raw && !r.options.corps);
   if (sansSchema.length) throw new Error(`Routes sans schéma de corps : ${sansSchema.map(r => `${r.methode} ${r.re.source}`).join(', ')}`);
@@ -62,7 +62,7 @@ export function createServer({ router, socle, jetons, quotas, webDir, socleWebDi
           if (chemin.startsWith('/socle/') && servirFichier(req, res, socleWebDir, chemin.slice(6), { nonce, cache: cache || 'public, max-age=3600' })) return;
           // Une adresse sans extension est une page de l'interface : #page côté navigateur.
           const fichier = chemin === '/' || !path.extname(chemin) ? '/index.html' : chemin;
-          if (servirFichier(req, res, webDir, fichier, { nonce, gamme: gamme(), version, ...(cache ? { cache } : {}) })) return;
+          if (servirFichier(req, res, webDir, fichier, { nonce, gamme: gamme(), disposition: disposition(), version, ...(cache ? { cache } : {}) })) return;
         }
         throw new HttpError(404, 'Introuvable');
       }

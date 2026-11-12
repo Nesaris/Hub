@@ -2,7 +2,7 @@
 // ceux de l'adresse (?…), leurs types et leurs bornes. Un champ inconnu est
 // refusé, ce qui ferme aussi l'affectation de masse. Une route qui écrit sans
 // schéma empêche le Hub de démarrer (server.js) : rien n'est ouvert par oubli.
-import { GAMMES, MODES_THEME } from '../theme.js';
+import { GAMMES, MODES_THEME, DISPOSITIONS } from '../theme.js';
 
 const TXT = (max = 200, o = {}) => ({ type: 'chaine', max, ...o });
 const REQ = s => ({ ...s, requis: true });
@@ -106,7 +106,7 @@ export const SCHEMAS = {
   'DELETE /api/connexions/hub': { corps: VIDE },
   'POST /api/connexions/appliquer': { corps: VIDE },
   'PUT /api/courriel': { corps: { defaut: TXT(254), relais: JSONV(1) } },
-  'PUT /api/theme': { corps: { mode: REQ(TXT(10, { parmi: MODES_THEME })), commun: REQ(TXT(20, { parmi: GAMMES })), parService: JSONV(1) } },
+  'PUT /api/theme': { corps: { mode: REQ(TXT(10, { parmi: MODES_THEME })), commun: REQ(TXT(20, { parmi: GAMMES })), parService: JSONV(1), disposition: TXT(10, { parmi: DISPOSITIONS }), dispositionParService: JSONV(1) } },
   'PUT /api/ai-autonomy': { corps: { value: REQ(TXT(20, { parmi: ['conseil', 'validation', 'autonome'] })) } },
 
   'POST /api/agent/nouvelle': { corps: VIDE },

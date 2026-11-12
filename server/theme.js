@@ -13,9 +13,9 @@
 // Deux façons de choisir, page Thème : une gamme pour tout, ou une par
 // service (le Hub compris, sous la clé « hub »). En mode par service, ce qui
 // n'a pas de choix propre prend la gamme commune.
-import { GAMMES } from '../socle/src/index.js';
+import { GAMMES, DISPOSITIONS } from '../socle/src/index.js';
 
-export { GAMMES };
+export { GAMMES, DISPOSITIONS };
 export const LIBELLES_GAMME = {
   soma: 'SOMA — fond papier ou sombre, accent bleu',
   console: 'Console — noir et vert, ou blanc et bleu',
@@ -57,3 +57,21 @@ export const gammePour = (reglage, cle) => (reglage.mode === 'service' && reglag
 
 // La pile rendue d'un service dit s'il suit la gamme : SOCLE_THEME y est posé.
 export const pileSuitLaGamme = texte => /^\s*SOCLE_THEME\s*:/m.test(texte || '');
+
+// Où se tient le menu, dans le Hub et dans les services dont le Compose lit
+// {{hub.disposition}} (posé en SOCLE_DISPOSITION) : une pour tout, ou une par
+// service quand le thème se règle par service. Chaque personne peut encore en
+// choisir une autre dans chaque application ; ceci n'est que la valeur par défaut.
+export const LIBELLES_DISPOSITION = { gauche: 'À gauche', haut: 'En haut', bas: 'En bas', droite: 'À droite' };
+export function reglageDisposition(db) {
+  const commun = db.setting('disposition', 'gauche');
+  const brut = db.setting('disposition_par_service', {});
+  const parService = brut && typeof brut === 'object' && !Array.isArray(brut)
+    ? Object.fromEntries(Object.entries(brut).filter(([, d]) => DISPOSITIONS.includes(d)))
+    : {};
+  return { mode: reglageTheme(db).mode, commun: DISPOSITIONS.includes(commun) ? commun : 'gauche', parService };
+}
+/** La disposition qui s'applique à `cle` : un identifiant de service, ou CLE_HUB. */
+export const dispositionPour = (reglage, cle) => (reglage.mode === 'service' && reglage.parService[cle]) || reglage.commun;
+// La pile rendue d'un service dit s'il suit la disposition : SOCLE_DISPOSITION y est posé.
+export const pileSuitLaDisposition = texte => /^\s*SOCLE_DISPOSITION\s*:/m.test(texte || '');

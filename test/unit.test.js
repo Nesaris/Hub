@@ -1796,6 +1796,26 @@ test('mémoire commune : lue et nourrie par les conversations des administrateur
   assert.equal(a.memoireDe('inconnu'), null);
 });
 
+test('menu : {{hub.disposition}} porte la position du service, à gauche par défaut ; seule une pile qui pose SOCLE_DISPOSITION la suit', async () => {
+  const { composeVars, renderCompose } = await import('../server/services.js');
+  const { DISPOSITIONS, dispositionPour, reglageDisposition, pileSuitLaDisposition } = await import('../server/theme.js');
+  assert.deepEqual(DISPOSITIONS, ['gauche', 'haut', 'bas', 'droite']);
+  assert.equal(renderCompose('SOCLE_DISPOSITION: "{{hub.disposition}}"', composeVars({ name: 'vigie', stack: 2 }, { install: {} }, {})), 'SOCLE_DISPOSITION: "gauche"');
+  assert.equal(renderCompose('SOCLE_DISPOSITION: "{{hub.disposition}}"', composeVars({ name: 'vigie', stack: 2 }, { install: {} }, {}, () => null, 'loopback', '', 'soma', 'bas')), 'SOCLE_DISPOSITION: "bas"');
+  assert.deepEqual(['    SOCLE_DISPOSITION: "haut"', 'SOCLE_THEME: "soma"', '# SOCLE_DISPOSITION: x'].map(pileSuitLaDisposition), [true, false, false]);
+  const reglages = {};
+  const db = { setting: (k, d) => (k in reglages ? reglages[k] : d) };
+  assert.deepEqual(reglageDisposition(db), { mode: 'commun', commun: 'gauche', parService: {} });
+  Object.assign(reglages, { disposition: 'haut', disposition_par_service: { vigie: 'droite', bad: 'milieu' }, theme_mode: 'service' });
+  const r = reglageDisposition(db);
+  assert.deepEqual(r.parService, { vigie: 'droite' }, 'une valeur inconnue enregistrée est ignorée');
+  assert.deepEqual([dispositionPour(r, 'vigie'), dispositionPour(r, 'hub')], ['droite', 'haut']);
+  reglages.theme_mode = 'commun';
+  assert.equal(dispositionPour(reglageDisposition(db), 'vigie'), 'haut', 'thème pour tout : la position commune');
+  reglages.disposition = 'milieu';
+  assert.equal(reglageDisposition(db).commun, 'gauche');
+});
+
 test('thème : {{hub.theme}} porte la gamme du service, SOMA à défaut ; seule une pile qui pose SOCLE_THEME la suit', async () => {
   const { composeVars, renderCompose } = await import('../server/services.js');
   const { gammeDu, gammePour, reglageTheme, pileSuitLaGamme, GAMMES } = await import('../server/theme.js');
@@ -1830,6 +1850,26 @@ test('thème : {{hub.theme}} porte la gamme du service, SOMA à défaut ; seule 
   assert.equal(pileSuitLaGamme('services:\n  api:\n    environment:\n      SOCLE_THEME: "console"\n'), true);
   assert.equal(pileSuitLaGamme('services:\n  oracle:\n    environment:\n      SOCLE_CLE: "x"\n'), false);
   assert.equal(pileSuitLaGamme('# SOCLE_THEME: absent'), false);
+});
+
+test('menu : seuls les services qui lisent la position et dont la position a changé sont redéployés, une fois', async () => {
+  const { Services } = await import('../server/services.js');
+  const reglage = { theme_mode: 'commun', theme_services: 'soma', disposition: 'gauche' };
+  const s = new Services({ db: { setting: (k, d) => (k in reglage ? reglage[k] : d), all: () => [], get: () => null, run() {} }, vault: { openFields: o => o, sealFields: o => o }, audit: { write() {} }, bus: { emit() {} }, registry: { get: () => null } });
+  s.suiventLaGamme = () => [{ id: 'a', name: 'vigie' }, { id: 'b', name: 'relay' }];
+  s.suiventLaDisposition = () => [{ id: 'a', name: 'vigie' }, { id: 'c', name: 'proxlab' }];
+  const faits = [];
+  s.redeploy = async id => { faits.push(id); };
+  const g = s.gammesDesServices(), d = s.dispositionsDesServices();
+  assert.deepEqual(d, { a: 'gauche', c: 'gauche' });
+  reglage.disposition = 'haut';
+  assert.deepEqual(s.appliquerGamme('admin', g, d), ['vigie', 'proxlab']);
+  // Gamme et position changées ensemble : un seul redémarrage par service.
+  const g2 = s.gammesDesServices(), d2 = s.dispositionsDesServices();
+  Object.assign(reglage, { theme_services: 'console', disposition: 'bas' });
+  assert.deepEqual(s.appliquerGamme('admin', g2, d2), ['vigie', 'relay', 'proxlab']);
+  await new Promise(r => setImmediate(r));
+  assert.deepEqual(faits.sort(), ['a', 'a', 'b', 'c', 'c'], 'deux réglages appliqués : chacun une fois par réglage');
 });
 
 test('thème : seuls les services qui lisent la gamme et dont la gamme a changé sont redéployés', async () => {

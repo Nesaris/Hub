@@ -43,7 +43,7 @@ import { IaServices } from './ia-services.js';
 import { AccesHub } from './acces-hub.js';
 import { LiensHub } from './liens-hub.js';
 import { log } from './util/common.js';
-import { CLE_HUB, gammePour, reglageTheme } from './theme.js';
+import { CLE_HUB, gammePour, reglageTheme, dispositionPour, reglageDisposition } from './theme.js';
 
 /* IPv4 d'abord. Sur un réseau sans vraie sortie IPv6 (le cas de la plupart
    des box et des réseaux Docker), Node prenait l'adresse IPv6 que le DNS
@@ -166,7 +166,7 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   accesHub.apresEcriture = () => liens.planifier();
   agent.accesHub = accesHub;
   hub.accesHub = accesHub;
-  hub.server = createServer({ router, socle, jetons, quotas, webDir: path.join(ROOT, 'web'), socleWebDir: path.join(ROOT, 'socle', 'web'), gamme: () => gammePour(reglageTheme(db), CLE_HUB), tls, apresEcriture: () => liens.planifier(), version: config.version });
+  hub.server = createServer({ router, socle, jetons, quotas, webDir: path.join(ROOT, 'web'), socleWebDir: path.join(ROOT, 'socle', 'web'), gamme: () => gammePour(reglageTheme(db), CLE_HUB), disposition: () => dispositionPour(reglageDisposition(db), CLE_HUB), tls, apresEcriture: () => liens.planifier(), version: config.version });
 
   const timers = [];
   hub.startBackground = async () => {

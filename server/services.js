@@ -12,7 +12,7 @@ import { archiveGithub, cibleDeConstruction, depotGithub, reempaqueter, referenc
 import { fuseau, render } from './manifest/template.js';
 import { containerName } from './runtime.js';
 import { HttpError, id, log, parseDuration, sleep } from './util/common.js';
-import { gammePour, reglageTheme, pileSuitLaGamme, gammeRecue, composeLitToutes, composeLitApparence } from './theme.js';
+import { gammePour, reglageTheme, pileSuitLaGamme, gammeRecue, composeLitToutes, composeLitApparence, reglageDisposition, dispositionPour, pileSuitLaDisposition } from './theme.js';
 
 const secretKeysOf = m => (m.config || []).filter(f => f.type === 'secret').map(f => f.key);
 const NAME_RE = /^[a-z0-9][a-z0-9-]{1,30}$/;
@@ -160,7 +160,7 @@ export function imageEpinglee(m, cfg) {
   return v !== undefined && v !== '' && def !== undefined && v !== def;
 }
 
-export function composeVars(inst, m, cfg, fournisseur = () => null, exposition = 'loopback', ui = '', gamme = 'soma') {
+export function composeVars(inst, m, cfg, fournisseur = () => null, exposition = 'loopback', ui = '', gamme = 'soma', disposition = 'gauche') {
   const ports = m.install.ports || [];
 
   /* ---------- les services dont celui-ci dépend ----------
@@ -213,6 +213,8 @@ export function composeVars(inst, m, cfg, fournisseur = () => null, exposition =
     'hub.theme': gammeRecue(gamme, 'premieres'),
     'hub.gamme': gammeRecue(gamme, 'exploitation'),
     'hub.apparence': gamme,
+    // Où se tient le menu par défaut (page Thème) ; chacun peut en choisir une autre dans l'application.
+    'hub.disposition': disposition,
     ...Object.fromEntries(ports.map(p => ['port.' + p.name, p.container])),
     ...Object.fromEntries(ports.map((p, i) => ['hostport.' + p.name,
       `${adresseEcoute(exposition, p)}:${portHote(inst.stack, i)}`])),
@@ -815,6 +817,19 @@ export class Services {
     return apparence.has(id) ? 'toutes' : toutes.has(id) ? 'exploitation' : 'premieres';
   }
 
+  /** Les services dont la pile pose SOCLE_DISPOSITION (leur Compose lit {{hub.disposition}}). */
+  suiventLaDisposition() {
+    return this.list().filter(i => {
+      if (i.mode !== 'compose') return false;
+      try { return pileSuitLaDisposition(fs.readFileSync(this.stackFile(i), 'utf8')); } catch { return false; }
+    });
+  }
+  /** La disposition que reçoit chaque service qui la lit, par identifiant. */
+  dispositionsDesServices() {
+    const reglage = reglageDisposition(this.db);
+    return Object.fromEntries(this.suiventLaDisposition().map(i => [i.id, dispositionPour(reglage, i.id)]));
+  }
+
   /** La gamme que reçoit chaque service qui la lit, par identifiant. */
   gammesDesServices() {
     const reglage = reglageTheme(this.db), apparence = this.lisentLApparence(), toutes = this.lisentToutesLesGammes();
@@ -827,9 +842,15 @@ export class Services {
    * tâche de fond, pour la recevoir. L'échec de l'un n'arrête pas les autres
    * et se lit dans son journal.
    */
-  appliquerGamme(actor, avant = {}) {
+  appliquerGamme(actor, avant = {}, dispositionsAvant = null) {
     const apres = this.gammesDesServices();
+    const dispositionsApres = dispositionsAvant ? this.dispositionsDesServices() : {};
     const cibles = this.suiventLaGamme().filter(i => avant[i.id] !== apres[i.id]);
+    if (dispositionsAvant) {
+      for (const i of this.suiventLaDisposition()) {
+        if (dispositionsAvant[i.id] !== dispositionsApres[i.id] && !cibles.some(c => c.id === i.id)) cibles.push(i);
+      }
+    }
     (async () => {
       for (const i of cibles) {
         try { await this.redeploy(i.id, actor); }
@@ -939,7 +960,7 @@ export class Services {
     const cfg = { ...(ctx.config || {}), ...propres, ...this.reglagesDuRelais(m, ctx.config || {}, publiee) };
     // Le relais d'envoi du Hub, pour un service qui n'a pas le sien (Réglages → Courriel).
     const smtp = smtpPourService(reglageCourriel(this.db, this.vault), cfg);
-    const rendered = renderCompose(tpl, composeVars(inst, m, { ...cfg, ...smtp }, cap => this.fournisseurPour(cap, inst), expo, ui, gammePour(reglageTheme(this.db), inst.id)));
+    const rendered = renderCompose(tpl, composeVars(inst, m, { ...cfg, ...smtp }, cap => this.fournisseurPour(cap, inst), expo, ui, gammePour(reglageTheme(this.db), inst.id), dispositionPour(reglageDisposition(this.db), inst.id)));
     checkCompose(rendered, m);
     for (const [cle, lit, ensemble] of [['services_toutes_gammes', composeLitToutes(tpl), this.lisentToutesLesGammes()], ['services_apparence', composeLitApparence(tpl), this.lisentLApparence()]]) {
       if (lit === ensemble.has(inst.id)) continue;

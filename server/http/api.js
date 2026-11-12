@@ -16,7 +16,7 @@ import { sortir } from '../sortie.js';
 import { avecSchemas } from './schemas.js';
 import { lienDe } from '../registry.js';
 import { coupure, poserCoupure, FONCTIONS as COUPURES } from '../coupure.js';
-import { GAMMES, LIBELLES_GAMME, CLE_HUB, gammePour, reglageTheme, gammesOffertes } from '../theme.js';
+import { GAMMES, LIBELLES_GAMME, CLE_HUB, gammePour, reglageTheme, gammesOffertes, DISPOSITIONS, LIBELLES_DISPOSITION, reglageDisposition, dispositionPour } from '../theme.js';
 import { vueCourriel, poserCourriel } from '../courriel.js';
 
 // Adresses des extraits d'écoute ElevenLabs, par identifiant de voix.
@@ -206,7 +206,12 @@ export function registerRoutes(routeur, h) {
   const vueTheme = () => {
     const reglage = reglageTheme(db);
     const suivent = new Set(services.suiventLaGamme().map(i => i.id)), toutes = services.lisentToutesLesGammes(), apparence = services.lisentLApparence();
+    const disp = reglageDisposition(db), placent = new Set(services.suiventLaDisposition().map(i => i.id));
     return {
+      disposition: disp.commun,
+      dispositionHub: dispositionPour(disp, CLE_HUB),
+      dispositionParService: disp.parService,
+      dispositions: DISPOSITIONS.map(d => ({ id: d, label: LIBELLES_DISPOSITION[d] })),
       mode: reglage.mode,
       commun: reglage.commun,
       hub: gammePour(reglage, CLE_HUB),
@@ -215,6 +220,7 @@ export function registerRoutes(routeur, h) {
       services: services.list().filter(i => i.mode === 'compose').map(i => ({
         id: i.id, name: i.name, nom: i.manifest?.name || i.name, suit: suivent.has(i.id), toutes: toutes.has(i.id) || apparence.has(i.id), gamme: gammePour(reglage, i.id),
         gammes: gammesOffertes(services.niveauGamme(i.id, apparence, toutes)),
+        place: placent.has(i.id), disposition: dispositionPour(disp, i.id),
       })),
     };
   };
@@ -273,22 +279,30 @@ export function registerRoutes(routeur, h) {
   r.put('/api/courriel', ctx => poserCourriel(db, h.vault, audit, ctx.body, ctx.user), { role: 'admin', renfort: true });
   r.get('/api/theme', vueTheme);
   r.put('/api/theme', ctx => {
-    const { mode, commun, parService } = ctx.body;
+    const { mode, commun, parService, disposition, dispositionParService } = ctx.body;
     const connus = new Set([CLE_HUB, ...services.list().filter(i => i.mode === 'compose').map(i => i.id)]);
-    const choix = {};
-    for (const [cle, g] of Object.entries(parService && typeof parService === 'object' && !Array.isArray(parService) ? parService : {})) {
-      if (!connus.has(cle)) throw new HttpError(400, 'Service inconnu');
-      if (!GAMMES.includes(g)) throw new HttpError(400, 'Gamme inconnue');
-      choix[cle] = g;
-    }
-    const avant = reglageTheme(db);
+    const lire = (brut, valides, erreur) => {
+      const choix = {};
+      for (const [cle, v] of Object.entries(brut && typeof brut === 'object' && !Array.isArray(brut) ? brut : {})) {
+        if (!connus.has(cle)) throw new HttpError(400, 'Service inconnu');
+        if (!valides.includes(v)) throw new HttpError(400, erreur);
+        choix[cle] = v;
+      }
+      return choix;
+    };
+    const choix = lire(parService, GAMMES, 'Gamme inconnue');
+    const choixDisposition = lire(dispositionParService, DISPOSITIONS, 'Disposition inconnue');
+    const avant = { ...reglageTheme(db), disposition: reglageDisposition(db) };
     const gammesAvant = services.gammesDesServices();
+    const dispositionsAvant = services.dispositionsDesServices();
     db.setSetting('theme_mode', mode);
     db.setSetting('theme_services', commun);
     if (parService !== undefined) db.setSetting('theme_par_service', choix);
-    const apres = reglageTheme(db);
+    if (disposition !== undefined) db.setSetting('disposition', disposition);
+    if (dispositionParService !== undefined) db.setSetting('disposition_par_service', choixDisposition);
+    const apres = { ...reglageTheme(db), disposition: reglageDisposition(db) };
     audit.write(ctx.user, 'apparence.modifiée', null, { avant, après: apres });
-    return { ...vueTheme(), appliqueA: services.appliquerGamme(ctx.user, gammesAvant) };
+    return { ...vueTheme(), appliqueA: services.appliquerGamme(ctx.user, gammesAvant, dispositionsAvant) };
   }, { role: 'admin' });
 
   r.get('/api/instances', () => services.list().map(i => services.publicView(i)));

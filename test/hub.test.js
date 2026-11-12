@@ -513,7 +513,7 @@ test('thème : une gamme pour tout ou une par service, validée, rendue dans la 
 
   const r = await api('PUT', '/api/theme', { mode: 'commun', commun: 'console' });
   assert.deepEqual([r.mode, r.commun, r.hub, r.appliqueA], ['commun', 'console', 'console', []]);
-  assert.match(await (await fetch(base + '/')).text(), /<html lang="fr" data-gamme="console">/);
+  assert.match(await (await fetch(base + '/')).text(), /<html lang="fr" data-gamme="console" data-disposition="gauche" data-disposition-defaut="gauche">/);
   const ligne = (await api('GET', '/api/audit?limit=5')).find(l => l.action === 'apparence.modifiée');
   assert.deepEqual([ligne.detail.avant.commun, ligne.detail.après.commun], ['soma', 'console']);
 
@@ -530,6 +530,28 @@ test('thème : une gamme pour tout ou une par service, validée, rendue dans la 
   assert.match(await (await fetch(base + '/')).text(), /data-gamme="lavande"/);
   await api('PUT', '/api/theme', { mode: 'commun', commun: 'soma', parService: {} });
   assert.match(await (await fetch(base + '/')).text(), /data-gamme="soma"/);
+
+  // Position du menu : une pour tout, ou une par service ; la page la porte,
+  // et le choix de la personne est lu avant le premier rendu.
+  assert.deepEqual([l.disposition, l.dispositionHub, l.dispositions.map(d => d.id)], ['gauche', 'gauche', ['gauche', 'haut', 'bas', 'droite']]);
+  await assert.rejects(api('PUT', '/api/theme', { mode: 'commun', commun: 'soma', disposition: 'milieu' }), e => e.status === 400);
+  await assert.rejects(api('PUT', '/api/theme', { mode: 'service', commun: 'soma', dispositionParService: { inconnu: 'haut' } }), e => e.status === 400 && /Service inconnu/.test(e.message));
+  await assert.rejects(api('PUT', '/api/theme', { mode: 'service', commun: 'soma', dispositionParService: { hub: 'milieu' } }), e => e.status === 400 && /Disposition inconnue/.test(e.message));
+  const h = await api('PUT', '/api/theme', { mode: 'commun', commun: 'soma', disposition: 'haut' });
+  assert.deepEqual([h.disposition, h.dispositionHub, h.commun], ['haut', 'haut', 'soma']);
+  const page = await (await fetch(base + '/')).text();
+  assert.match(page, /data-disposition="haut" data-disposition-defaut="haut"/);
+  assert.match(page, /<head><script nonce="[^"]+">try\{var d=localStorage\.getItem\('socle\.disposition'\)/);
+  const dp = await api('PUT', '/api/theme', { mode: 'service', commun: 'soma', parService: {}, dispositionParService: { hub: 'droite' } });
+  assert.deepEqual([dp.disposition, dp.dispositionHub, dp.dispositionParService], ['haut', 'droite', { hub: 'droite' }]);
+  assert.match(await (await fetch(base + '/')).text(), /data-disposition="droite"/);
+  const jd = (await api('GET', '/api/audit?limit=5')).find(x => x.action === 'apparence.modifiée');
+  assert.deepEqual([jd.detail.avant.disposition.commun, jd.detail.après.disposition.parService], ['haut', { hub: 'droite' }]);
+  // Le réglage d'avant (sans disposition) reste accepté et ne la change pas.
+  const sans = await api('PUT', '/api/theme', { mode: 'commun', commun: 'soma', parService: {} });
+  assert.equal(sans.disposition, 'haut');
+  await api('PUT', '/api/theme', { mode: 'commun', commun: 'soma', parService: {}, disposition: 'gauche', dispositionParService: {} });
+  assert.match(await (await fetch(base + '/')).text(), /data-disposition="gauche"/);
 });
 
 test('agent IA : noms au lieu d’ids corrigés, plan cassé renvoyé une fois au modèle', async () => {
