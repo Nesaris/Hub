@@ -3,11 +3,11 @@
 #   sudo ./install.sh              installe ou met à jour
 #   sudo ./install.sh --uninstall  arrête et retire les conteneurs (données conservées)
 #   sudo ./install.sh --purge      arrête, retire les conteneurs ET supprime les données
-# Variables : HUB_DIR (défaut /opt/hub), HUB_REPO (défaut https://github.com/CodexX64/hub), HUB_REF (défaut main)
+# Variables : HUB_DIR (défaut /opt/hub), HUB_REPO (défaut https://github.com/Nesaris/Hub), HUB_REF (défaut main)
 set -euo pipefail
 
 HUB_DIR="${HUB_DIR:-/opt/hub}"
-HUB_REPO="${HUB_REPO:-https://github.com/CodexX64/hub}"
+HUB_REPO="${HUB_REPO:-https://github.com/Nesaris/Hub}"
 HUB_REF="${HUB_REF:-main}"
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 

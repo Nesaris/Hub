@@ -136,7 +136,7 @@ test('fichiers cachés : /.env et /.git répondent 404, pas l’interface', asyn
 test('security.txt : où signaler une faille', async () => {
   const r = await admin.get('/.well-known/security.txt');
   assert.equal(r.status, 200);
-  assert.match(r.texte, /^Contact: https:\/\/github\.com\/CodexX64\/hub\/security\/advisories\/new$/m);
+  assert.match(r.texte, /^Contact: https:\/\/github\.com\/Nesaris\/Hub\/security\/advisories\/new$/m);
   assert.match(r.texte, /^Expires: \d{4}-/m);
 });
 

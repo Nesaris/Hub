@@ -58,7 +58,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // Signalement d'une faille : l'exploitant de l'instance le pose dans
 // SOCLE_CONTACT_SECURITE ; sans lui, /.well-known/security.txt n'est pas servi.
 // Où signaler une faille (/.well-known/security.txt) ; SOCLE_CONTACT_SECURITE le remplace.
-const SERVICE = { id: 'hub', nom: 'Hub', contactSecurite: 'https://github.com/CodexX64/hub/security/advisories/new' };
+const SERVICE = { id: 'hub', nom: 'Hub', contactSecurite: 'https://github.com/Nesaris/Hub/security/advisories/new' };
 // Les lignes du journal de sécurité partent sur la sortie standard quel que
 // soit HUB_LOG_LEVEL : les journaux du conteneur les gardent hors de portée du Hub.
 const JOURNAL_SOCLE = {
