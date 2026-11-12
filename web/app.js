@@ -441,7 +441,7 @@ function brancherDash(el, relire) {
 }
 const actionIcon = a => (a.startsWith('workflow') ? 'libre' : a.startsWith('service') ? 'server' : a.startsWith('ia') ? 'sparkle' : a.startsWith('connexion') || a.startsWith('mfa') ? 'key' : a.startsWith('journal') ? 'logs' : 'check');
 const ACTIONS = { 'workflow.créé': 'Workflow créé', 'workflow.activé': 'Workflow activé', 'workflow.coupé': 'Workflow coupé', 'workflow.modifié': 'Workflow modifié', 'workflow.supprimé': 'Workflow supprimé', 'workflow.test': 'Test lancé', 'service.connexion': 'Service distant connecté', 'service.installation': 'Service installé', 'service.suppression': 'Service retiré', 'service.échec': 'Échec d’ajout de service', 'capacité.liée': 'Capacité reliée', 'connexion': 'Connexion', 'connexion.échec': 'Connexion refusée', 'ia.plan': 'Plan proposé par l’IA', 'ia.plan_exécuté': 'Plan de l’IA exécuté', 'ia.ajoutée': 'IA ajoutée', 'catalogue.actualisé': 'Catalogue actualisé', 'validation.acceptée': 'Validation acceptée', 'validation.refusée': 'Validation refusée' };
-Object.assign(ACTIONS, {'action.lancée': 'Action lancée', 'alertes.essai': 'Alerte d’essai envoyée', 'alertes.mise_a_jour_lancée': 'Mise à jour lancée depuis une alerte', 'alertes.mise_a_jour_reportée': 'Mise à jour reportée', 'alertes.réglées': 'Alertes réglées', 'apparence.modifiée': 'Apparence modifiée', 'coffre.tourné': 'Clé du coffre tournée', 'compte.a2f_exigée': 'A2F exigée pour un compte', 'compte.créé': 'Compte créé', 'compte.invité': 'Compte invité', 'compte.lien_réinitialisation': 'Lien de réinitialisation créé', 'compte.modifié': 'Compte modifié', 'compte.mot_de_passe': 'Mot de passe changé', 'compte.supprimé': 'Compte supprimé', 'comptes.a2f': 'A2F des comptes', 'connexion.appliquee': 'Relay réappliqué', 'connexion.cloudflare': 'Cloudflare connecté', 'connexion.cloudflare_retire': 'Cloudflare déconnecté', 'connexion.creee': 'Route créée', 'connexion.domaines': 'Domaines modifiés', 'connexion.exposition_retiree': 'Exposition retirée', 'connexion.hub_publie': 'Hub publié', 'connexion.hub_retire': 'Nom du Hub retiré', 'connexion.modifiee': 'Route modifiée', 'connexion.publiee': 'Service publié', 'connexion.retiree': 'Nom retiré', 'connexion.supprimee': 'Route supprimée', 'connexion.tout_en_ligne': 'Tout passé par le tunnel', 'connexion.tunnel': 'Tunnel choisi', 'connexion.tunnel_coupe': 'Tunnel coupé', 'coupure.modifiée': 'Coupure d’urgence modifiée', 'courriel.modifié': 'Courriel des comptes modifié', 'destinations.modifiées': 'Destinations internes modifiées', 'destinations.reprises': 'Destinations internes reprises', 'dossier.créé': 'Dossier créé', 'dossier.renommé': 'Dossier renommé', 'exposition.modifiée': 'Exposition modifiée', 'exécution.rejouée': 'Exécution rejouée', 'ia.autonomie': 'Autonomie de l’assistant', 'ia.canal_par_défaut': 'Canal par défaut de l’assistant', 'ia.cerveau_refusé': 'Mémoire refusée', 'ia.conversation': 'Question à l’assistant', 'ia.corrigée': 'Réponse corrigée', 'ia.hub': 'Action de l’assistant', 'ia.interrompue': 'Réponse interrompue', 'ia.lien': 'Lien IA d’un service', 'ia.modifiée': 'IA modifiée', 'ia.nouvelle_conversation': 'Nouvelle conversation', 'ia.ordre': 'Ordre des IA', 'ia.outil.connecté': 'Outil IA connecté', 'ia.outil.connexion': 'Connexion d’un outil IA lancée', 'ia.plafond': 'Plafond de l’IA atteint', 'ia.plan_refusé': 'Plan refusé', 'ia.retirée': 'IA retirée', 'ia.service_branché': 'Service branché à l’IA', 'image.construite': 'Image construite', 'jeton.créé': 'Jeton d’accès créé', 'jeton.révoqué': 'Jeton d’accès révoqué', 'liens.hub': 'Liens du Hub mis à jour', 'manifeste.importé': 'Manifeste importé', 'message.essai': 'Message d’essai', 'message.écoute': 'Message reçu', 'mfa.activé': 'Second facteur activé', 'mfa.code_secours': 'Code de secours utilisé', 'mfa.échec': 'Second facteur refusé', 'registres.modifiés': 'Registres modifiés', 'secret.dévoilé': 'Clé dévoilée', 'secret.oublié': 'Clé oubliée', 'secret.posé': 'Clé enregistrée', 'service.adresse': 'Adresse d’un service changée', 'service.manifeste_actualisé': 'Manifeste repris', 'service.relié': 'Service relié', 'service.réglages': 'Réglages d’un service', 'service.secret_effacé': 'Secret d’un service effacé', 'variable.définie': 'Variable définie', 'variable.supprimée': 'Variable supprimée', 'voix.question': 'Question vocale', 'webhook.secret_renouvelé': 'Secret de webhook renouvelé', 'workflow.activation_reportée': 'Activation reportée', 'workflow.conversion_ia_échec': 'Conversion vers l’IA du Hub impossible', 'workflow.noms_réparés': 'Noms de workflows réparés', 'workflow.rangé': 'Workflow rangé', 'workflows.rangés': 'Workflows rangés', 'workflows.recréés': 'Workflows recréés', 'workflows.vers_ia_du_hub': 'Workflows passés par l’IA du Hub'});
+Object.assign(ACTIONS, {'action.lancée': 'Action lancée', 'adaptation.auto': 'Adaptation par l’IA réglée', 'adaptation.faite': 'Dépôt adapté par l’IA', 'adaptation.validée': 'Adaptation validée à l’installation', 'alertes.essai': 'Alerte d’essai envoyée', 'alertes.mise_a_jour_lancée': 'Mise à jour lancée depuis une alerte', 'alertes.mise_a_jour_reportée': 'Mise à jour reportée', 'alertes.réglées': 'Alertes réglées', 'apparence.modifiée': 'Apparence modifiée', 'coffre.tourné': 'Clé du coffre tournée', 'compte.a2f_exigée': 'A2F exigée pour un compte', 'compte.créé': 'Compte créé', 'compte.invité': 'Compte invité', 'compte.lien_réinitialisation': 'Lien de réinitialisation créé', 'compte.modifié': 'Compte modifié', 'compte.mot_de_passe': 'Mot de passe changé', 'compte.supprimé': 'Compte supprimé', 'comptes.a2f': 'A2F des comptes', 'connexion.appliquee': 'Relay réappliqué', 'connexion.cloudflare': 'Cloudflare connecté', 'connexion.cloudflare_retire': 'Cloudflare déconnecté', 'connexion.creee': 'Route créée', 'connexion.domaines': 'Domaines modifiés', 'connexion.exposition_retiree': 'Exposition retirée', 'connexion.hub_publie': 'Hub publié', 'connexion.hub_retire': 'Nom du Hub retiré', 'connexion.modifiee': 'Route modifiée', 'connexion.publiee': 'Service publié', 'connexion.retiree': 'Nom retiré', 'connexion.supprimee': 'Route supprimée', 'connexion.tout_en_ligne': 'Tout passé par le tunnel', 'connexion.tunnel': 'Tunnel choisi', 'connexion.tunnel_coupe': 'Tunnel coupé', 'coupure.modifiée': 'Coupure d’urgence modifiée', 'courriel.modifié': 'Courriel des comptes modifié', 'destinations.modifiées': 'Destinations internes modifiées', 'destinations.reprises': 'Destinations internes reprises', 'dossier.créé': 'Dossier créé', 'dossier.renommé': 'Dossier renommé', 'exposition.modifiée': 'Exposition modifiée', 'exécution.rejouée': 'Exécution rejouée', 'ia.autonomie': 'Autonomie de l’assistant', 'ia.canal_par_défaut': 'Canal par défaut de l’assistant', 'ia.cerveau_refusé': 'Mémoire refusée', 'ia.conversation': 'Question à l’assistant', 'ia.corrigée': 'Réponse corrigée', 'ia.hub': 'Action de l’assistant', 'ia.interrompue': 'Réponse interrompue', 'ia.lien': 'Lien IA d’un service', 'ia.modifiée': 'IA modifiée', 'ia.nouvelle_conversation': 'Nouvelle conversation', 'ia.ordre': 'Ordre des IA', 'ia.outil.connecté': 'Outil IA connecté', 'ia.outil.connexion': 'Connexion d’un outil IA lancée', 'ia.plafond': 'Plafond de l’IA atteint', 'ia.plan_refusé': 'Plan refusé', 'ia.retirée': 'IA retirée', 'ia.service_branché': 'Service branché à l’IA', 'image.construite': 'Image construite', 'jeton.créé': 'Jeton d’accès créé', 'jeton.révoqué': 'Jeton d’accès révoqué', 'liens.hub': 'Liens du Hub mis à jour', 'manifeste.importé': 'Manifeste importé', 'message.essai': 'Message d’essai', 'message.écoute': 'Message reçu', 'mfa.activé': 'Second facteur activé', 'mfa.code_secours': 'Code de secours utilisé', 'mfa.échec': 'Second facteur refusé', 'registres.modifiés': 'Registres modifiés', 'secret.dévoilé': 'Clé dévoilée', 'secret.oublié': 'Clé oubliée', 'secret.posé': 'Clé enregistrée', 'service.adresse': 'Adresse d’un service changée', 'service.manifeste_actualisé': 'Manifeste repris', 'service.relié': 'Service relié', 'service.réglages': 'Réglages d’un service', 'service.secret_effacé': 'Secret d’un service effacé', 'variable.définie': 'Variable définie', 'variable.supprimée': 'Variable supprimée', 'voix.question': 'Question vocale', 'webhook.secret_renouvelé': 'Secret de webhook renouvelé', 'workflow.activation_reportée': 'Activation reportée', 'workflow.conversion_ia_échec': 'Conversion vers l’IA du Hub impossible', 'workflow.noms_réparés': 'Noms de workflows réparés', 'workflow.rangé': 'Workflow rangé', 'workflows.rangés': 'Workflows rangés', 'workflows.recréés': 'Workflows recréés', 'workflows.vers_ia_du_hub': 'Workflows passés par l’IA du Hub'});
 const labelAction = r => `${ACTIONS[r.action] || r.action}${r.target ? ' : ' + r.target : ''}`;
 
 function bindCommon(el) {
@@ -469,7 +469,7 @@ async function viewExt(el, t) {
       const m = it.manifest;
       const caps = l => (l || []).map(c => html`<span class="chip m">${c}</span>`);
       return html`<div class="card ext">
-        <header><span class="itile">${I(pictoService(m.icon))}</span><div class="grow"><h2>${m.name}</h2><p class="mini">${m.version} · ${it.source}</p></div></header>
+        <header><span class="itile">${I(pictoService(m.icon))}</span><div class="grow"><h2>${m.name}</h2><p class="mini">${it.adapte ? `github.com/${it.adapte.repo}` : `${m.version} · ${it.source}`}</p></div>${it.adapte ? html`<span class="chip m" title=${`Adaptée par l’IA (${it.adapte.modele || 'IA du Hub'}) depuis le commit ${String(it.adapte.sha).slice(0, 12)}`}>${I('sparkle', 12)}adaptée par l’IA</span>` : ''}</header>
         <div class="body"><p>${m.description}</p>
           <dl class="caps"><dt>Fournit</dt><dd>${m.capabilities.provides?.length ? caps(m.capabilities.provides) : '—'}</dd>
           ${m.capabilities.requires?.length ? html`<dt>Requiert</dt><dd>${caps(m.capabilities.requires)}</dd>` : ''}
@@ -492,17 +492,61 @@ async function viewExt(el, t) {
         </div>
       </div>`) : html`<div class="list-empty">Aucun service pour l’instant.</div>`}</div>`;
   } else {
-    corps = html`<div class="card"><div class="sec"><span class="itile key">${I('globe')}</span><div><h2>Registres d’extensions</h2><p>Un par ligne : <span class="mono">github-user:compte</span>, <span class="mono">github:propriétaire/dépôt@branche</span>, <span class="mono">https://…/index.json</span>, <span class="mono">dir:/chemin</span> ou <span class="mono">local</span>.</p></div></div>
-      <div class="pad"><textarea class="field" id="sources">${cat.sources.join('\n')}</textarea>
-      <div class="gap"></div><div class="row pied-reg"><span class="help">Dernière actualisation : ${when(cat.refreshed)}</span><div class="act"><button class="btn" id="refresh">${I('refresh', 14)}Actualiser</button><button class="btn solid" id="saveSrc">Enregistrer</button></div></div>
-      ${cat.errors.length ? html`<div class="gap"></div><div class="problems"><b>Erreurs de chargement</b>${cat.errors.map((e, i) => html`${i ? html`<br>` : ''}${`${e.source}${e.id ? ' / ' + e.id : ''} : ${e.error}`}`)}</div>` : ''}</div></div>
+    // Les registres : des comptes GitHub qu'on colle par leur lien. Ce qui
+    // n'a pas de manifeste peut être rendu compatible par l'IA du Hub, si la
+    // licence du dépôt le permet.
+    const reg = await GET('/api/catalog/registres');
+    if (!alive(t)) return;
+    const compte = x => /^github-user:/.test(x.source);
+    const nomDe = x => x.source.replace(/^github-user:/, '').replace(/^github:/, '');
+    const ETAT = { nouveau: ['Pas encore examiné', ''], 'en-cours': ['L’IA y travaille…', 'm'], adapte: ['Adapté', 'a'], refuse: ['Refusé', 'warn'], echec: ['Échec', 'warn'] };
+    const depots = reg.registres.flatMap(x => x.depots.map(d => ({ ...d, source: x.source })));
+    const montrerTout = S.depotsTous;
+    const visibles = montrerTout ? depots : depots.slice(0, 6);
+    const ligneDepot = d => {
+      const [lib, cl] = d.etat === 'adapte' && !d.aJour ? ['Nouvelle version à adapter', 'm'] : ETAT[d.etat] || [d.etat, ''];
+      const peut = d.licenceOk && reg.ia && d.etat !== 'en-cours' && !(d.etat === 'adapte' && d.aJour);
+      return html`<div class="flowrow depot">
+        <span class="itile ${d.etat === 'adapte' ? 'key' : ''}">${I(d.etat === 'adapte' ? 'check' : 'code')}</span>
+        <div class="svc-t"><strong><a href=${`https://github.com/${d.repo}`} target="_blank" rel="noopener">${d.repo}</a></strong>
+          <div class="chain une-ligne">${d.description || 'Sans description'}</div>
+          ${d.raison ? html`<div class="svc-detail" title=${d.raison}>${d.raison}</div>` : ''}</div>
+        <div class="fin">
+          <span class="chip ${d.licenceOk ? 'a' : 'warn'}" title=${d.licenceOk ? 'Licence libre : adaptation permise' : 'Licence qui ne permet pas l’adaptation'}>${d.licenceNom || d.licence || 'sans licence'}</span>
+          <span class="chip ${cl} cache-m">${lib}</span>
+          ${peut ? html`<button class="btn sm ${d.etat === 'adapte' ? '' : 'solid'}" data-adapter=${d.repo}>${I('sparkle', 13)}${d.etat === 'adapte' ? 'Réadapter' : 'Rendre compatible'}</button>` : ''}
+        </div></div>`;
+    };
+    corps = html`<div class="card"><div class="sec"><span class="itile key">${I('globe')}</span><div><h2>Comptes GitHub</h2><p>Colle le lien d’un compte : chaque dépôt qui porte un <span class="mono">hub.json</span> devient une extension. Les autres peuvent être rendus compatibles par l’IA, si leur licence le permet.</p></div></div>
+      <div class="pad">
+        <div class="registres">${reg.registres.map(x => html`<div class="flowrow registre">
+          <span class="itile">${I(compte(x) ? 'users' : x.lien ? 'code' : 'folder')}</span>
+          <div class="svc-t"><strong>${x.lien ? html`<a href=${x.lien} target="_blank" rel="noopener">${nomDe(x)}</a>` : x.source}</strong>
+            <div class="chain">${x.extensions} extension${x.extensions > 1 ? 's' : ''}${x.adaptees ? ` · ${x.adaptees} adaptée${x.adaptees > 1 ? 's' : ''} par l’IA` : ''}${compte(x) && x.depots.length ? ` · ${x.depots.length} dépôt${x.depots.length > 1 ? 's' : ''} sans manifeste` : ''}</div></div>
+          <div class="fin">
+            ${compte(x) ? html`<label class="check auto-ia" title="Après chaque actualisation, l’IA adapte jusqu’à trois dépôts dont la licence le permet. Rien ne s’installe sans toi."><button class="toggle ${x.auto ? 'on' : ''}" data-auto=${x.source} aria-label=${`Adapter les dépôts de ${nomDe(x)} avec l’IA`} aria-pressed=${String(x.auto)}><i></i></button><span>Adapter avec l’IA</span></label>` : ''}
+            <button class="btn sm flat" data-retirer=${x.source} aria-label=${`Retirer ${nomDe(x)}`}>${I('x', 14)}</button>
+          </div></div>`)}</div>
+        <div class="gap"></div>
+        <div class="row ajout-registre"><input class="field mono grow" id="nouveauRegistre" placeholder="https://github.com/compte" aria-label="Lien d’un compte GitHub" autocomplete="off" spellcheck="false"><button class="btn solid" id="ajouterRegistre">${I('plus', 14)}Ajouter</button></div>
+        <div class="gap"></div><div class="row pied-reg"><span class="help">Dernière actualisation : ${when(reg.refreshed)}</span><div class="act"><button class="btn" id="refresh">${I('refresh', 14)}Actualiser</button></div></div>
+        ${reg.errors.length ? html`<div class="gap"></div><div class="problems"><b>Erreurs de chargement</b>${reg.errors.map((e, i) => html`${i ? html`<br>` : ''}${`${e.source}${e.id ? ' / ' + e.id : ''} : ${e.error}`}`)}</div>` : ''}
+        <details class="avance"><summary>Écriture avancée</summary>
+          <p class="help">Un registre par ligne : <span class="mono">github-user:compte</span>, <span class="mono">github:propriétaire/dépôt@branche</span>, <span class="mono">https://…/index.json</span>, <span class="mono">dir:/chemin</span> ou <span class="mono">local</span>.</p>
+          <textarea class="field" id="sources">${reg.registres.map(x => x.source).join('\n')}</textarea>
+          <div class="gap"></div><div class="row"><span class="grow"></span><button class="btn" id="saveSrc">Enregistrer</button></div>
+        </details></div></div>
+      <div class="card"><div class="sec"><span class="itile">${I('sparkle')}</span><div><h2>Dépôts à rendre compatibles</h2><p>L’IA lit la licence, puis décrit l’application ; le Hub écrit lui-même le manifeste et le Compose, sans privilège. Rien n’est modifié sur GitHub, et rien ne s’installe sans que tu aies relu.</p></div></div>
+        ${!reg.ia ? html`<div class="pad"><div class="hookbox warn"><b>Aucune IA branchée</b><span>Ajoute une connexion dans la page IA (rôle « config ») pour adapter des dépôts.</span><button class="btn sm" data-nav="ia">Ouvrir IA</button></div></div>` : ''}
+        ${depots.length ? html`<div>${visibles.map(ligneDepot)}</div>${depots.length > visibles.length || montrerTout ? html`<div class="pad-bas"><button class="btn sm flat" id="depotsTous">${montrerTout ? 'Afficher moins' : `Afficher les ${depots.length} dépôts`}</button></div>` : ''}`
+          : html`<div class="list-empty">Tous les dépôts des comptes lus ont déjà leur manifeste, ou aucun compte n’a encore été actualisé.</div>`}</div>
       <div class="card"><div class="sec"><span class="itile">${I('code')}</span><div><h2>Importer un manifeste</h2><p>Pour tester une extension en développement. Un manifeste importé ne peut être utilisé qu’en mode distant.</p></div></div>
       <div class="pad"><textarea class="field" id="manifest" placeholder='{ "manifestVersion": 1, "id": "…" }'></textarea><div class="gap"></div><div class="row"><span class="grow"></span><button class="btn solid" id="import">Importer</button></div></div></div>`;
   }
   poser(el, headrow('Extensions', 'Installe un service ici en un clic, ou connecte-toi à un service qui tourne sur une autre machine. Le Hub le configure et le relie aux autres.',
     html`<button class="btn" id="refreshTop">${I('refresh', 15)}<span class="cache-s">Actualiser le catalogue</span></button>`), onglets, corps);
   $$('[data-tab]', el).forEach(b => { b.onclick = () => { S.extTab = b.dataset.tab; viewExt(el, t); }; });
-  $$('[data-add]', el).forEach(b => { b.onclick = () => addServiceDialog(cat.items.find(x => x.id === b.dataset.add).manifest, b.dataset.mode); });
+  $$('[data-add]', el).forEach(b => { b.onclick = () => { const it = cat.items.find(x => x.id === b.dataset.add); addServiceDialog(it.manifest, b.dataset.mode, it); }; });
   $$('[data-inst]', el).forEach(r => {
     r.onclick = () => instanceDialog(r.dataset.inst);
     r.onkeydown = e => { if (e.key === 'Enter' && e.target === r) instanceDialog(r.dataset.inst); };
@@ -529,6 +573,44 @@ async function viewExt(el, t) {
     toast('Registres enregistrés');
     setTimeout(() => alive(t) && viewExt(el, t), 1400);
   }).catch(fail);
+  const enregistrerRegistres = async (liste, message) => {
+    await PUT('/api/catalog/sources', { sources: liste });
+    toast(message);
+    setTimeout(() => alive(t) && viewExt(el, t), 400);
+  };
+  const sourcesActuelles = () => ($('#sources', el)?.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+  if ($('#ajouterRegistre', el)) {
+    const ajouter = e => pulse(e.currentTarget || $('#ajouterRegistre', el), async () => {
+      const lien = $('#nouveauRegistre', el).value.trim();
+      if (!lien) throw new Error('Colle le lien d’un compte GitHub, par exemple https://github.com/Nesaris.');
+      await enregistrerRegistres([...sourcesActuelles(), lien], 'Compte ajouté, catalogue actualisé');
+    }).catch(fail);
+    $('#ajouterRegistre', el).onclick = ajouter;
+    $('#nouveauRegistre', el).onkeydown = e => { if (e.key === 'Enter') ajouter(e); };
+  }
+  $$('[data-retirer]', el).forEach(b => { b.onclick = async () => {
+    if (!(await confirmBox(`Retirer ${b.dataset.retirer.replace(/^github-user:/, '')} ?`, 'Ses extensions quittent le catalogue ; celles déjà en service restent et gardent leurs mises à jour connues.', 'Retirer'))) return;
+    try { await enregistrerRegistres(sourcesActuelles().filter(s => s !== b.dataset.retirer), 'Registre retiré'); } catch (e) { fail(e); }
+  }; });
+  $$('[data-auto]', el).forEach(b => { b.onclick = e => { e.preventDefault(); pulse(b, async () => {
+    const actif = !b.classList.contains('on');
+    const r = await PUT('/api/catalog/registres/auto', { source: b.dataset.auto, auto: actif });
+    toast(actif ? (r.lances.length ? `L’IA examine ${r.lances.length} dépôt${r.lances.length > 1 ? 's' : ''}` : 'Adaptation par l’IA activée') : 'Adaptation par l’IA coupée');
+    viewExt(el, t);
+  }).catch(fail); }; });
+  $$('[data-adapter]', el).forEach(b => { b.onclick = () => pulse(b, async () => {
+    await POST('/api/catalog/depots/adapter', { repo: b.dataset.adapter });
+    toast('L’IA lit la licence et le dépôt : la ligne se met à jour toute seule.');
+    viewExt(el, t);
+  }).catch(fail); });
+  if ($('#depotsTous', el)) $('#depotsTous', el).onclick = () => { S.depotsTous = !S.depotsTous; viewExt(el, t); };
+  // L'état des adaptations arrive par les événements : une seule écoute par page, et un seul repeint par rafale.
+  if (S.ecouteRegistres !== t) {
+    S.ecouteRegistres = t;
+    let attente = null;
+    app.on('catalog', () => { clearTimeout(attente); attente = setTimeout(() => alive(t) && S.extTab === 'sources' && viewExt(el, t), 500); });
+  }
+  bindCommon(el);
   if ($('#import', el)) $('#import', el).onclick = async () => { try { const m = JSON.parse($('#manifest', el).value); await POST('/api/catalog/import', { manifest: m }); toast('Manifeste importé'); S.extTab = 'catalog'; viewExt(el, t); } catch (e) { fail(e); } };
   app.on('instance', () => alive(t) && S.extTab === 'installed' && viewExt(el, t));
 }
@@ -563,9 +645,12 @@ function permsOf(m) {
   return out;
 }
 
-function addServiceDialog(m, mode) {
+function addServiceDialog(m, mode, item = null) {
   const remote = mode === 'remote';
   const perms = permsOf(m);
+  // Une extension adaptée par l'IA : sa provenance, sa licence et son Compose, à relire avant d'accorder.
+  const a = item?.adapte;
+  if (a && !remote) perms.push({ label: 'Adaptée par l’IA', why: `code de github.com/${a.repo} au commit ${String(a.sha).slice(0, 12)}, licence ${a.licenceNom || a.licence}${a.obligations?.length ? ` — à respecter : ${a.obligations.join(' ; ')}` : ''}. L’image est construite ici depuis ce commit.` });
   // Un champ à choix fermé était écarté du formulaire d'installation : le
   // service n'existe pas encore, donc personne ne pouvait répondre. Ceux
   // dont la liste vit chez un AUTRE service, lui déjà installé, sont
@@ -584,7 +669,7 @@ function addServiceDialog(m, mode) {
         ${remote ? html`<div class="fl"><label for="svcUrl">${r.label || 'Adresse'}</label><div class="row nowrap-row"><input class="field mono grow" id="svcUrl" placeholder=${r.placeholder || 'http://192.0.2.50:' + (r.defaultPort || 80)}><button class="btn sm" type="button" id="testUrl">Tester</button></div><div class="help" id="testRes"></div></div>` : ''}
       </div>
       ${remote && r.setupHelp ? html`<div class="hookbox"><b>Sur l’autre machine</b><span>${r.setupHelp}</span></div>` : ''}
-      ${!remote && perms.length ? html`<div class="hookbox warn"><b>Permissions demandées</b>${perms.map(p => html`<span><b>${p.label}</b> — ${p.why}</span>`)}<label class="check"><input type="checkbox" id="permOk"> J’accorde ces permissions à ${m.name}</label></div>` : ''}
+      ${!remote && perms.length ? html`<div class="hookbox warn"><b>${a ? 'À relire avant d’installer' : 'Permissions demandées'}</b>${perms.map(p => html`<span><b>${p.label}</b> — ${p.why}</span>`)}${a ? html`<details class="compose-relu"><summary>Fichier Compose écrit par le Hub</summary><pre class="mono">${a.compose}</pre></details>` : ''}<label class="check"><input type="checkbox" id="permOk"> ${a ? `J’ai relu, j’installe ${m.name}` : `J’accorde ces permissions à ${m.name}`}</label></div>` : ''}
       ${fields.length ? html`<div id="cfgForm">${formulaire(fields.filter(f => remote ? true : !/REMOTE|PROXY/i.test(f.key)), {}, {}, 'c')}</div>` : ''}
       <div class="term" id="steps" hidden></div>`,
     actions: [{ label: 'Annuler' }, { label: remote ? 'Connecter' : 'Installer', cls: 'solid', run: async modalEl => {
