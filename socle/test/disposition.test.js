@@ -40,15 +40,18 @@ test('la page porte la disposition du service ; le choix de la personne est lu a
 
 test('les quatre positions dans chaque gamme : barre en haut ou en bas, rail à droite, tiroir à droite sur téléphone', () => {
   const css = fs.readFileSync(path.join(WEB, 'soma.css'), 'utf8');
-  assert.match(css, /html\[data-disposition="droite"\] \.rail\{order:9\}/);
-  assert.match(css, /html\[data-disposition="haut"\] \.app\{grid-template-rows:auto minmax\(0,1fr\)\}/);
-  assert.match(css, /html\[data-disposition="bas"\] \.app\{grid-template-rows:minmax\(0,1fr\) auto\}/);
-  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="haut"\] \.nav\.on::before/);
-  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="bas"\] \.nav\.on::before/);
-  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="droite"\] \.nav\.on::before/);
-  assert.match(css, /html\[data-disposition="haut"\]:is\(\[data-gamme="console"\],\[data-gamme="exploitation"\]\) \.rail\{border-right:0;border-bottom/);
-  assert.match(css, /html\[data-disposition="droite"\] \.rail\{left:auto;right:0;transform:translateX\(100%\)\}/);
+  assert.match(css, /html\[data-disposition="droite"\] nav\.rail\{order:9\}/);
+  assert.match(css, /html\[data-disposition="haut"\] :has\(>nav\.rail\)\{grid-template-rows:auto minmax\(0,1fr\)\}/);
+  assert.match(css, /html\[data-disposition="bas"\] :has\(>nav\.rail\)\{grid-template-rows:minmax\(0,1fr\) auto\}/);
+  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="haut"\] nav\.rail \.nav\.on::before/);
+  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="bas"\] nav\.rail \.nav\.on::before/);
+  assert.match(css, /html\[data-gamme="lavande"\]\[data-disposition="droite"\] nav\.rail \.nav\.on::before/);
+  assert.match(css, /html\[data-disposition="haut"\]:is\(\[data-gamme="console"\],\[data-gamme="exploitation"\]\) nav\.rail\{border-right:0;border-bottom/);
+  assert.match(css, /html\[data-disposition="droite"\] nav\.rail\{left:auto;right:0;transform:translateX\(100%\)\}/);
   assert.match(css, /\.top \.menu,html:is\(\[data-disposition="haut"\],\[data-disposition="bas"\]\) \.voile-rail\{display:none!important\}/);
+  // Les aperçus de la page Thème (i.rail) ne sont jamais pris pour le menu.
+  const bloc = css.slice(css.indexOf('/* Disposition du menu'), css.indexOf('/* Le bouton de la barre du haut'));
+  assert.deepEqual(bloc.split('\n').filter(l => /(^|[\s,(>])\.rail(?![\w-])/.test(l)), []);
 });
 
 test('navigateur : choix gardé par application, « par défaut » rend celle du service, valeur inconnue ignorée', async () => {

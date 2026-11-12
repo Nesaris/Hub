@@ -51,17 +51,21 @@ export function choisirDisposition(d) {
 export function surDisposition(f) { ecouteurs.add(f); return () => ecouteurs.delete(f); }
 
 let installe = false;
+const avecGeste = new WeakSet();
 /**
  * À appeler une fois au démarrage de l'interface. `rail` : l'élément du menu
  * (nav.rail par défaut). Sans rail, seul le choix est appliqué.
  */
 export function installerDisposition({ rail = document.querySelector('nav.rail'), bouton = true, nomDefaut = 'Par défaut' } = {}) {
   appliquer(lirePersonnel() || dispositionParDefaut());
-  if (installe) return;
-  installe = true;
-  addEventListener('storage', e => { if (e.key === CLE) appliquer(lirePersonnel() || dispositionParDefaut()); });
+  if (!installe) {
+    installe = true;
+    addEventListener('storage', e => { if (e.key === CLE) appliquer(lirePersonnel() || dispositionParDefaut()); });
+  }
+  // Une interface qui reconstruit son cadre (changement de langue) rappelle
+  // l'installation : le nouveau menu reçoit le geste, une seule fois.
   if (!rail) return;
-  gesteDeplacer(rail);
+  if (!avecGeste.has(rail)) { avecGeste.add(rail); gesteDeplacer(rail); }
   // Le choix à portée de main, à côté de la bascule clair ou sombre de la barre du haut.
   const voisin = bouton && document.querySelector('.top .bascule-theme, .topright .bascule-theme');
   if (voisin && !document.querySelector('.bouton-disposition')) voisin.after(boutonDisposition({ nomDefaut }));
