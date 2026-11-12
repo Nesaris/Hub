@@ -913,16 +913,16 @@ test('catalogue : une extension disparue de son compte GitHub le quitte, jamais 
   const { configurer } = await import('../server/sortie.js');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hub-cat-'));
   const db = openDb(path.join(dir, 'h.db'));
-  db.setSetting('registries', ['github-user:CodexX64']);
-  const ligne = (id, source = 'github-user:CodexX64') => db.run('INSERT INTO catalog(id,source,version,manifest,origin,fetched) VALUES(?,?,?,?,?,?)', id, source, '1.0.0', JSON.stringify({ id, name: id }), JSON.stringify({ type: 'github', repo: `CodexX64/${id}`, ref: 'main' }), 1);
+  db.setSetting('registries', ['github-user:Acme']);
+  const ligne = (id, source = 'github-user:Acme') => db.run('INSERT INTO catalog(id,source,version,manifest,origin,fetched) VALUES(?,?,?,?,?,?)', id, source, '1.0.0', JSON.stringify({ id, name: id }), JSON.stringify({ type: 'github', repo: `Acme/${id}`, ref: 'main' }), 1);
   ligne('sentinel'); ligne('vieux-installe'); ligne('perso', 'import'); ligne('ailleurs', 'github-user:Autre');
   db.run('INSERT INTO instances(id,ext_id,name,mode,url,stack,config,manifest,version,status,created) VALUES(?,?,?,?,?,?,?,?,?,?,?)', 'i1', 'vieux-installe', 'vieux', 'compose', 'http://x', 10, '{}', '{}', '1.0.0', 'online', 1);
   const audits = [];
   const r = new Registry({ db, audit: { write: (...a) => audits.push(a) }, bus: { emit() {} } });
   r.check = () => true;
-  r.readFile = async root => { if (root.repo === 'CodexX64/nexarc') return Buffer.from(JSON.stringify({ id: 'nexarc', version: '2.0.0' })); throw new Error('pas de hub.json'); };
+  r.readFile = async root => { if (root.repo === 'Acme/nexarc') return Buffer.from(JSON.stringify({ id: 'nexarc', version: '2.0.0' })); throw new Error('pas de hub.json'); };
   let statut = 429;
-  configurer({ transport: async () => (statut === 200 ? new Response(JSON.stringify([{ full_name: 'CodexX64/nexarc', default_branch: 'main' }, { full_name: 'CodexX64/site', default_branch: 'main' }]), { status: 200 }) : new Response('', { status: statut })) });
+  configurer({ transport: async () => (statut === 200 ? new Response(JSON.stringify([{ full_name: 'Acme/nexarc', default_branch: 'main' }, { full_name: 'Acme/site', default_branch: 'main' }]), { status: 200 }) : new Response('', { status: statut })) });
   try {
     await r.refreshMaintenant('ana');
     assert.ok(db.get('SELECT id FROM catalog WHERE id=?', 'sentinel'), 'GitHub muet : rien n’est retiré');

@@ -26,7 +26,7 @@ export const SPEC_HUB = {
   // Origine de l'interface quand elle diffère de celle du Hub : ajoutée aux
   // origines admises pour les écritures (comme SOCLE_ORIGINES).
   uiOrigin: { env: 'HUB_UI_ORIGIN', type: 'url' },
-  registryDefault: { env: 'HUB_REGISTRY', type: 'chaine', motif: /^(local|github-user:[\w.-]{1,39}|github:[\w.-]{1,39}\/[\w.-]{1,100}(@[\w./-]{1,100})?|dir:\S+|https:\/\/\S+)$/, defaut: 'github-user:CodexX64' },
+  registryDefault: { env: 'HUB_REGISTRY', type: 'chaine', motif: /^(local|github-user:[\w.-]{1,39}|github:[\w.-]{1,39}\/[\w.-]{1,100}(@[\w./-]{1,100})?|dir:\S+|https:\/\/\S+)$/, defaut: 'github-user:Nesaris' },
   registryLocalDir: { env: 'HUB_REGISTRY_LOCAL', type: 'chaine', defaut: './registry-local' },
   dockerNetwork: { env: 'HUB_DOCKER_NETWORK', type: 'chaine', motif: /^[\w.-]{1,64}$/, defaut: 'hub_net' },
   // Remplacé par la détection du socle : HTTPS direct, ou relais déclaré dans SOCLE_PROXYS.
