@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.16.0",
+    "date": "2026-11-12",
+    "points": [
+      "Registres : colle le lien d’un compte GitHub pour l’ajouter, autant que tu veux. Nesaris est lu par défaut.",
+      "Un dépôt sans manifeste peut être rendu compatible par l’IA du Hub, seulement si sa licence permet d’utiliser et de modifier le code. Le Hub écrit le manifeste et le Compose, sans privilège, construit l’image au commit lu, et rien ne s’installe sans ta validation."
+    ]
+  },
+  {
     "version": "0.15.3",
     "date": "2026-11-03",
     "points": [
