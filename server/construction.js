@@ -20,6 +20,11 @@ const DEPOT_GITHUB = /^https:\/\/github\.com\/([\w.-]{1,39})\/([\w.-]{1,100}?)(?
 
 /** Le dépôt GitHub d'une extension : celui du catalogue, sinon celui que déclare son manifeste. */
 export function depotGithub(manifest, origin) {
+  // Une adaptation par l'IA : le dépôt d'origine, figé sur le commit lu.
+  if (origin?.type === 'adapte' && /^[\w.-]+\/[\w.-]+$/.test(origin.repo || '') && /^[0-9a-f]{40}$/.test(origin.sha || '')) {
+    const [owner, repo] = origin.repo.split('/');
+    return { owner, repo, branche: origin.ref || 'main', sha: origin.sha };
+  }
   if (origin?.type === 'github' && /^[\w.-]+\/[\w.-]+$/.test(origin.repo || '')) {
     const [owner, repo] = origin.repo.split('/');
     return { owner, repo, branche: origin.ref || 'main' };
@@ -172,6 +177,8 @@ export async function archiveGithub({ owner, repo }, refGit, { sortie = sortir }
 
 /** Les références à essayer pour une étiquette d'image, dans l'ordre. */
 export function referencesPour(tag, depot, versionCatalogue) {
+  // Une adaptation se construit au commit lu, et à rien d'autre.
+  if (depot?.sha) return tag === `hub-${depot.sha.slice(0, 12)}` ? [depot.sha] : [];
   const out = [];
   if (/^v?\d+\.\d+\.\d+([-.][\w.]+)?$/.test(tag)) out.push(`refs/tags/${tag.startsWith('v') ? tag : `v${tag}`}`);
   // La branche lue par le catalogue porte la version qu'il affiche : elle

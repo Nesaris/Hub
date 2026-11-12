@@ -9,6 +9,7 @@ import { openDb } from './db/index.js';
 import { Vault, tournerCle } from './vault.js';
 import { Audit } from './audit.js';
 import { Registry } from './registry.js';
+import { Adaptation } from './adaptation.js';
 import { Services } from './services.js';
 import { Runtime } from './runtime.js';
 import { Capabilities } from './capabilities.js';
@@ -124,6 +125,9 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   services.attach({ runtime, capabilities, connexions });
   const ai = new AiGateway({ db, vault, audit, services });
   capabilities.attach({ ai });
+  // Les dépôts sans manifeste, rendus compatibles par l'IA quand leur licence le permet.
+  const adaptation = new Adaptation({ db, audit, bus, registry, ai });
+  registry.adaptation = adaptation;
   // L'IA du Hub pour les services : toutes les IA de la page IA, derrière une API Ollama / OpenAI.
   const iaServices = new IaServices({ db, ai, services, audit, quotas });
   services.iaServices = iaServices;
@@ -153,7 +157,7 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   // Les alertes du Hub sur Telegram ; un bouton reçu pendant une écoute de l'assistant leur revient.
   const alertes = new Alertes({ db, bus, audit, services, ai, agent });
   agent.surRappel = cq => alertes.rappel(cq);
-  const hub = { db, bus, vault, audit, socle, jetons, registry, destinations, services, runtime, store, capabilities, ai, engine, triggers, probes, mesures, agent, accounts, connexions, secrets, memoire, logos, voix, cerveau, journal, alertes, liens };
+  const hub = { db, bus, vault, audit, socle, jetons, registry, adaptation, destinations, services, runtime, store, capabilities, ai, engine, triggers, probes, mesures, agent, accounts, connexions, secrets, memoire, logos, voix, cerveau, journal, alertes, liens };
   const router = new Router();
   registerRoutes(router, hub);
   hub.router = router;

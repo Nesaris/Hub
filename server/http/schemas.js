@@ -36,6 +36,8 @@ export const SCHEMAS = {
   'POST /api/catalog/refresh': { corps: { auto: OUI } },
   'PUT /api/catalog/sources': { corps: { sources: REQ(LISTE(TXT(300), 50)) } },
   'POST /api/catalog/import': { corps: { manifest: REQ(JSONV(24)) } },
+  'PUT /api/catalog/registres/auto': { corps: { source: REQ(TXT(300)), auto: REQ(OUI) } },
+  'POST /api/catalog/depots/adapter': { corps: { repo: REQ(TXT(141, { motif: /^[\w.-]{1,39}\/[\w.-]{1,100}$/ })) } },
   // kind et ref : envoyés par les pages déjà ouvertes avant la 0.9.12 ; sans effet avant l'installation.
   'POST /api/catalog/:extId/options': { corps: { key: REQ(TXT(100)), kind: TXT(10, { parmi: ['trigger', 'action', 'config'] }), ref: TXT(100) } },
   'POST /api/catalog/:id/test-remote': { corps: { url: REQ(URL_) } },

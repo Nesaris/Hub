@@ -11,6 +11,28 @@ import { compareVersions } from './services.js';
 const schema = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'manifest/schema.json'), 'utf8'));
 export const validateManifest = createValidator(schema);
 
+/**
+ * Un registre tel qu'on le colle : le lien d'un compte GitHub
+ * (https://github.com/Nesaris), d'un dépôt (…/compte/dépôt, …/tree/branche),
+ * ou un nom de compte seul, devient l'écriture du Hub (github-user:compte,
+ * github:compte/dépôt@branche). Les autres écritures passent telles quelles.
+ */
+export function sourceDepuisLien(brut) {
+  const s = String(brut || '').trim().replace(/^git\+/, '');
+  const compte = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]{1,39})\/?$/i.exec(s) || /^@?([A-Za-z0-9][\w-]{0,38})$/.exec(s);
+  if (compte && compte[1] !== 'local') return `github-user:${compte[1]}`;
+  const depot = /^(?:https?:\/\/)?(?:www\.)?github\.com\/([\w.-]{1,39})\/([\w.-]{1,100}?)(?:\.git)?(?:\/tree\/([\w./-]{1,100}?))?\/?$/i.exec(s);
+  if (depot) return `github:${depot[1]}/${depot[2]}${depot[3] ? `@${depot[3]}` : ''}`;
+  return s;
+}
+/** Le lien GitHub d'un registre, pour l'afficher ; null s'il n'est pas sur GitHub. */
+export function lienDe(source) {
+  const u = /^github-user:([\w.-]+)$/.exec(source);
+  if (u) return `https://github.com/${u[1]}`;
+  const d = /^github:([\w.-]+\/[\w.-]+)(?:@([\w./-]+))?$/.exec(source);
+  return d ? `https://github.com/${d[1]}${d[2] ? `/tree/${d[2]}` : ''}` : null;
+}
+
 export function parseSource(s) {
   if (s === 'local') return { type: 'local', dir: config.registryLocalDir, label: 'local' };
   const u = /^github-user:([\w.-]+)$/.exec(s);
@@ -46,8 +68,11 @@ const AUTO_MS = config.catalogueAutoMs;
 export class Registry {
   constructor({ db, audit, bus }) { this.db = db; this.audit = audit; this.bus = bus; this.errors = []; }
 
-  sources() { return this.db.setting('registries', [config.registryDefault, 'local']); }
-  setSources(list, actor) {
+  // L'ancien registre par défaut, écrit dans les .env et les réglages d'avant
+  // 0.16 : ses dépôts ont rejoint le compte Nesaris, lu à sa place.
+  sources() { return [...new Set(this.db.setting('registries', [config.registryDefault, 'local']).map(s => s === 'github-user:CodexX64' ? 'github-user:Nesaris' : s))]; }
+  setSources(liste, actor) {
+    const list = [...new Set(liste.map(sourceDepuisLien).filter(Boolean))];
     list.forEach(parseSource);
     this.db.setSetting('registries', list);
     this.audit.write(actor, 'registres.modifiés', null, { list });
@@ -160,6 +185,7 @@ export class Registry {
     }
     this.vus = null;
     this.commits = null;
+    if (this.adaptation) for (const s of this.sources()) { try { this.adaptation.planifier(s, actor); } catch (err) { log.warn('adaptation', s, err.message); } }
     try { await this.suivreDemenagements(actor); } catch (err) { log.warn('registre', 'dépôts déplacés', err.message); }
     this.db.setSetting('registry_refreshed', Date.now());
     this.bus.emit('catalog', { count, retires });
@@ -198,13 +224,20 @@ export class Registry {
       if (r.fork || r.archived || r.disabled) continue;
       const root = await this.racineGithub(r.full_name, r.default_branch || 'main');
       let buf;
-      try { buf = await this.readFile(root, 'hub.json'); } catch { continue; } // pas une extension
+      try { buf = await this.readFile(root, 'hub.json'); } catch {
+        // Pas de manifeste : un candidat à l'adaptation par l'IA, noté avec sa licence.
+        if (this.adaptation) { try { this.adaptation.noter(src.label, r, root.sha); } catch (err) { log.warn('registre', r.full_name, 'adaptation', err.message); } }
+        continue;
+      }
+      this.adaptation?.oublier(r.full_name);
       try {
         const m = JSON.parse(buf.toString('utf8'));
         await this.load(src, root, { id: m.id, repo: r.full_name, ref: root.ref, manifest: 'hub.json' }, buf);
         count++;
       } catch (err) { this.errors.push({ source: src.label, id: r.name, error: err.message }); log.warn('registre', src.label, r.name, err.message); }
     }
+    // Les extensions adaptées par l'IA restent au catalogue tant que leur source le lit.
+    if (this.adaptation) for (const id of this.adaptation.extensionsDe(src.label)) this.vus?.add(id);
     return { count, complet };
   }
 
@@ -274,8 +307,9 @@ export class Registry {
     // La même extension dans deux sources (le registre livré avec le Hub et
     // son dépôt GitHub) : la plus récente reste. Avant, la dernière source lue
     // gagnait — Relay 2.1.2 du registre local masquait 2.2.0 publié.
-    const deja = this.db.get('SELECT source, version FROM catalog WHERE id=?', manifest.id);
-    if (deja && deja.source !== src.label && deja.source !== 'import' && compareVersions(deja.version, manifest.version) > 0) return;
+    const deja = this.db.get('SELECT source, version, origin FROM catalog WHERE id=?', manifest.id);
+    const adaptee = (() => { try { return JSON.parse(deja?.origin || '{}').type === 'adapte'; } catch { return false; } })();
+    if (deja && !adaptee && deja.source !== src.label && deja.source !== 'import' && compareVersions(deja.version, manifest.version) > 0) return;
     this.vus?.add(manifest.id);
     this.db.run(`INSERT INTO catalog(id,source,version,manifest,origin,fetched) VALUES(?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET source=excluded.source, version=excluded.version, manifest=excluded.manifest, origin=excluded.origin, fetched=excluded.fetched`,
@@ -320,12 +354,14 @@ export class Registry {
   remplacantDe(extId) {
     let ancien;
     try { ancien = this.get(extId); } catch { return null; }
-    return this.list().find(e => e.id !== extId && e.source !== 'import' && e.source === ancien.source
+    return this.list().find(e => e.id !== extId && e.source !== 'import' && e.origin?.type !== 'adapte' && e.source === ancien.source
       && (e.manifest.replaces || []).some(r => r.id === extId)) || null;
   }
   async composeFile(entry) {
     const o = entry.origin;
     if (o.type === 'import') throw new HttpError(400, 'Manifeste importé : installe-le en mode distant, ou publie-le dans un registre pour l’installer ici.');
+    // Une adaptation : le Compose écrit par le Hub, gardé avec elle.
+    if (o.type === 'adapte') { if (typeof o.compose !== 'string' || !o.compose) throw new HttpError(400, 'Adaptation sans fichier Compose : relance-la depuis Registres.'); return o.compose; }
     const buf = await this.readFile(o, entry.manifest.install.compose);
     if (o.composeSha256 && sha256(buf) !== o.composeSha256) throw new HttpError(400, 'Empreinte du fichier Compose différente de l’index');
     return buf.toString('utf8');

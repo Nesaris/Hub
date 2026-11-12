@@ -437,6 +437,12 @@ export class Services {
     if (perms.length && mode !== 'remote' && m.install.type !== 'external' && !acceptPermissions) {
       throw new HttpError(409, `${m.name} demande des permissions à valider : ${perms.map(p => p.label).join(', ')}.`, { permissions: perms });
     }
+    // Une extension adaptée par l'IA : installée ici seulement, après validation explicite.
+    if (entry.origin?.type === 'adapte') {
+      if (mode === 'remote') throw new HttpError(400, `${m.name} a été adaptée par l’IA pour être installée ici : elle ne se connecte pas à distance.`);
+      if (!acceptPermissions) throw new HttpError(409, `${m.name} a été adaptée par l’IA depuis github.com/${entry.origin.repo} : relis sa licence et son Compose, puis valide l’installation.`, { permissions: [{ key: 'adapte', label: 'Adaptée par l’IA', why: `Code de github.com/${entry.origin.repo} au commit ${String(entry.origin.sha).slice(0, 12)}, licence ${entry.origin.licence}.` }] });
+      this.audit.write(actor, 'adaptation.validée', m.id, { depot: entry.origin.repo, commit: entry.origin.sha, licence: entry.origin.licence });
+    }
     if (m.install.type === 'external') mode = 'remote';
     mode = mode === 'remote' ? 'remote' : 'compose';
     if (mode === 'remote') {
@@ -895,14 +901,14 @@ export class Services {
     for (const r of refs) {
       const cle = `${ou}@${r}`;
       if (!archives.has(cle)) {
-        this.progress(inst.id, `Image absente du registre : sources de ${ou} (${r.replace(/^refs\/(tags|heads)\//, '')})`, 'run');
+        this.progress(inst.id, `Image absente du registre : sources de ${ou} (${depot.sha ? `commit ${r.slice(0, 12)}` : r.replace(/^refs\/(tags|heads)\//, '')})`, 'run');
         let tgz;
         try { tgz = await (this.archiveGithub || archiveGithub)(depot, r); } catch (e) { throw new HttpError(502, `${ref} : ${e.message}.`); }
         archives.set(cle, tgz ? reempaqueter(tgz) : null);
       }
       if (archives.get(cle)) { contexte = archives.get(cle); utilisee = r; break; }
     }
-    if (!contexte) throw new HttpError(502, `${ref} : ni le tag v${tag.replace(/^v/, '')} ni la branche ${depot.branche} de ${ou} ne correspondent à cette version.`);
+    if (!contexte) throw new HttpError(502, depot.sha ? `${ref} : le commit ${depot.sha.slice(0, 12)} de ${ou} est introuvable (dépôt réécrit ou supprimé) : relance l’adaptation depuis Registres.` : `${ref} : ni le tag v${tag.replace(/^v/, '')} ni la branche ${depot.branche} de ${ou} ne correspondent à cette version.`);
     this.progress(inst.id, `Construction de ${ref}${cible.cible ? ` (étape ${cible.cible})` : ''} — quelques minutes`, 'run');
     try { await docker.construire(ref, contexte, cible.cible); }
     catch (e) { throw new HttpError(502, `Construction de ${ref} impossible : ${String(e.message).replace(/^docker build[^:]*: /, '').slice(0, 300)}`); }
@@ -953,6 +959,13 @@ export class Services {
     // machine (dépôt privé) compte comme un changement, même sans téléchargement.
     const enService = tirer ? await docker.imagesEnService(`hub-${inst.name}`) : new Map();
     for (const ref of imagesOf(rendered)) {
+      // Une adaptation par l'IA ne se télécharge jamais : son image est
+      // construite ici, depuis le commit lu, et elle seule.
+      if (entry?.origin?.type === 'adapte') {
+        if (await docker.imageExists(ref)) { this.progress(inst.id, `Image déjà présente : ${ref}`); continue; }
+        if (await this.construireDepuisSources(inst, entry, ref, archives)) { changees++; continue; }
+        throw new HttpError(502, `${ref} n’est pas l’image de cette adaptation : relance l’adaptation depuis Registres.`);
+      }
       // Une mise à jour retélécharge les images à étiquette mobile (latest…) :
       // sans cela, « mettre à jour » relancerait exactement la même chose.
       // Une étiquette fixe (2.0.3) désigne une image qui ne change pas : déjà

@@ -1827,6 +1827,8 @@ test('autorisation : chaque route balayée sans session, en lecture seule et en 
     'DELETE /api/accounts/x/x',
     'POST /api/catalog/refresh',
     'PUT /api/catalog/sources',
+    'PUT /api/catalog/registres/auto',
+    'POST /api/catalog/depots/adapter',
     'POST /api/catalog/import',
     'PUT /api/exposition',
     'PUT /api/theme',

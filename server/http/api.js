@@ -14,6 +14,7 @@ import { CATALOGUE as SECRETS_CATALOGUE, CATEGORIES as SECRETS_CATEGORIES, decri
 import { EXPOSITIONS, EXPOSITION_LIBELLE, hoteValide } from '../services.js';
 import { sortir } from '../sortie.js';
 import { avecSchemas } from './schemas.js';
+import { lienDe } from '../registry.js';
 import { coupure, poserCoupure, FONCTIONS as COUPURES } from '../coupure.js';
 import { GAMMES, LIBELLES_GAMME, CLE_HUB, gammePour, reglageTheme, gammesOffertes } from '../theme.js';
 import { vueCourriel, poserCourriel } from '../courriel.js';
@@ -48,7 +49,7 @@ const qui = ctx => ({ compte: ctx.jeton ? `jeton:${ctx.jeton.id}` : ctx.compte.i
 export function registerRoutes(routeur, h) {
   const r = avecSchemas(routeur);
   dbPourAdresse = h.db;
-  const { db, jetons, audit, bus, registry, destinations, services, runtime, store, engine, triggers, probes, mesures, ai, agent, accounts, secrets, logos, voix } = h;
+  const { db, jetons, audit, bus, registry, adaptation, destinations, services, runtime, store, engine, triggers, probes, mesures, ai, agent, accounts, secrets, logos, voix } = h;
 
   // État
   // Vivant ou non, pour les sondes (CREUSET, le conteneur) : ni version, ni
@@ -121,7 +122,32 @@ export function registerRoutes(routeur, h) {
   }, { role: 'admin' });
 
   // Catalogue et services
-  r.get('/api/catalog', () => ({ sources: registry.sources(), refreshed: db.setting('registry_refreshed'), errors: registry.errors, items: registry.list().map(e => ({ id: e.id, source: e.source, version: e.version, manifest: e.manifest })) }));
+  // Une extension adaptée par l'IA porte de quoi la relire avant de l'installer : dépôt, commit, licence, Compose.
+  const vueAdaptee = o => (o?.type === 'adapte' ? { repo: o.repo, sha: o.sha, licence: o.licence, licenceNom: o.licenceNom, obligations: o.obligations || [], modele: o.modele, le: o.le, compose: o.compose } : null);
+  r.get('/api/catalog', () => ({ sources: registry.sources(), refreshed: db.setting('registry_refreshed'), errors: registry.errors, items: registry.list().map(e => ({ id: e.id, source: e.source, version: e.version, manifest: e.manifest, ...(e.origin?.type === 'adapte' ? { adapte: vueAdaptee(e.origin) } : {}) })) }));
+  // Les registres tels qu'on les lit : leur lien, ce qu'ils apportent, et les dépôts sans manifeste que l'IA peut adapter.
+  r.get('/api/catalog/registres', () => {
+    const lignes = registry.list();
+    return {
+      refreshed: db.setting('registry_refreshed'), errors: registry.errors,
+      ia: db.get('SELECT COUNT(*) AS n FROM ai_connections').n > 0,
+      registres: registry.sources().map(s => ({
+        source: s, lien: lienDe(s), auto: adaptation.auto(s),
+        extensions: lignes.filter(e => e.source === s && e.origin?.type !== 'adapte').length,
+        adaptees: lignes.filter(e => e.source === s && e.origin?.type === 'adapte').length,
+        depots: adaptation.liste(s).map(d => ({ repo: d.repo, description: d.description, etoiles: d.etoiles, licence: d.licence, licenceNom: d.licenceNom, licenceOk: d.licenceOk, etat: d.etat, raison: d.raison, extId: d.ext_id, aJour: d.aJour, maj: d.maj, modele: d.detail?.modele || null })),
+      })),
+    };
+  });
+  r.put('/api/catalog/registres/auto', ctx => {
+    if (!registry.sources().includes(ctx.body.source)) throw new HttpError(404, 'Registre inconnu.');
+    adaptation.poserAuto(ctx.body.source, ctx.body.auto, ctx.user);
+    return { auto: adaptation.auto(ctx.body.source), lances: ctx.body.auto ? adaptation.planifier(ctx.body.source, ctx.user) : [] };
+  }, { role: 'admin' });
+  r.post('/api/catalog/depots/adapter', ctx => {
+    adaptation.lancer(ctx.body.repo, ctx.user);
+    return { repo: ctx.body.repo, etat: 'en-cours' };
+  }, { role: 'admin', quota: { nom: 'adaptation', minute: 10, jour: 200 } });
   r.post('/api/catalog/refresh', ctx => (ctx.body?.auto ? registry.refreshAuto() : registry.refresh(ctx.user)), { role: 'admin', quota: { nom: 'catalogue', minute: 60, jour: 2000 } });
   r.put('/api/catalog/sources', ctx => { registry.setSources(ctx.body.sources || [], ctx.user); return registry.refresh(ctx.user); }, { role: 'admin' });
   r.post('/api/catalog/import', ctx => registry.importManifest(ctx.body.manifest, ctx.user), { role: 'admin', bodyLimit: 2 * 1024 * 1024 });
