@@ -5,9 +5,11 @@ Un service devient une extension quand son dépôt contient :
 1. `hub.json` à la racine, conforme à `hub-extension.schema.json`. Le plus simple est de partir de `exemple-docker-control.hub.json` (service installé par le Hub) ou de `exemple-ollama.hub.json` (service qui tourne ailleurs), puis de le valider contre le schéma.
 2. `deploy/compose.hub.yml`, seulement si le service peut être installé sur la machine du Hub.
 
-Rien d'autre à faire : le registre par défaut, `github-user:CodexX64`, parcourt les dépôts publics du compte (hors forks et archives) et retient ceux qui ont un `hub.json` à la racine de leur branche par défaut. Le catalogue se met à jour avec **Extensions → Actualiser**.
+Rien d'autre à faire : le registre par défaut, le compte `Nesaris`, parcourt les dépôts publics du compte (hors forks et archives) et retient ceux qui ont un `hub.json` à la racine de leur branche par défaut. Le catalogue se met à jour avec **Extensions → Actualiser**.
 
-Autres sources possibles dans **Extensions → Registres** :
+Dans **Extensions → Registres**, on ajoute un compte en collant son lien (`https://github.com/compte`) ; le lien d'un dépôt (`https://github.com/compte/dépôt`, ou `…/tree/branche`) n'ajoute que ce dépôt. Les dépôts d'un compte qui n'ont pas de `hub.json` y sont listés avec leur licence : quand elle permet d'utiliser et de modifier le code, et que le dépôt a un `Dockerfile` à la racine, l'IA du Hub peut le rendre compatible (voir *Principes* dans le README). Un `hub.json` écrit à la main reste la meilleure voie : dès qu'il apparaît, il remplace l'adaptation.
+
+Toutes les sources, écrites telles quelles dans *Avancé* :
 
 | Source | Usage |
 | --- | --- |
@@ -93,7 +95,7 @@ Utilise uniquement des volumes nommés : le Hub tourne lui-même en conteneur, d
 ## Vérifier avant de publier
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/CodexX64/hub/main/docs/hub-extension.schema.json
+curl -fsSLO https://raw.githubusercontent.com/Nesaris/Hub/main/docs/hub-extension.schema.json
 npx --yes -p ajv-cli@5 -p ajv-formats ajv validate --spec=draft2020 --strict=false -c ajv-formats -s hub-extension.schema.json -d hub.json
 ```
 

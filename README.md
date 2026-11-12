@@ -40,7 +40,7 @@ Quatre gammes d’interface au choix — SOMA, Console, Exploitation, Lavande �
 ## Installation
 
 ```bash
-git clone https://github.com/CodexX64/hub && cd hub && sudo ./install.sh
+git clone https://github.com/Nesaris/Hub hub && cd hub && sudo ./install.sh
 ```
 
 Le script :
@@ -162,7 +162,8 @@ L'apparence se règle dans l'interface, page Thème : SOMA (fond papier ou sombr
 
 | Élément | Rôle |
 | --- | --- |
-| **Extension** | Un service décrit par un fichier `hub.json` (voir `docs/hub-extension.schema.json`). Le catalogue vient des dépôts du compte GitHub `CodexX64` qui portent un `hub.json` à la racine (`github-user:CodexX64`) et du dossier `registry-local/`. |
+| **Extension** | Un service décrit par un fichier `hub.json` (voir `docs/hub-extension.schema.json`). Le catalogue vient des comptes GitHub listés dans **Extensions → Registres** (par défaut `Nesaris` ; on colle le lien d'un compte pour en ajouter un) : chaque dépôt qui porte un `hub.json` à la racine devient une extension. S'y ajoute le dossier `registry-local/`. |
+| **Adaptation par l'IA** | Un dépôt sans `hub.json` peut être rendu compatible, depuis **Extensions → Registres**, par l'IA de la page IA (rôle Configuration). Seulement si sa licence permet d'utiliser et de modifier le code (MIT, Apache, BSD, MPL, GPL, AGPL…) : sans licence, licence non commerciale ou « source disponible » (BSL, SSPL, Elastic, Commons Clause…), c'est refusé, sans appeler l'IA. Il faut aussi un `Dockerfile` à la racine. L'IA relit la licence (elle ne peut que refuser) et décrit le service (port, santé, volumes, réglages) ; le Hub écrit lui-même le manifeste et le Compose, sans privilège ni socket Docker, et construit l'image au commit lu. Rien n'est publié ni écrit dans le dépôt d'origine. L'extension apparaît « adaptée par l'IA » et ne s'installe qu'après ta validation (licence, obligations, Compose). L'adaptation automatique se coche par compte ; elle est coupée par défaut. |
 | **Instance** | Une extension ajoutée au Hub, de deux façons : **installée ici** (Compose sur la machine du Hub) ou **distante** (le service tourne ailleurs, le Hub s'y connecte par son adresse). |
 | **Capacités** | Chaque service déclare ce qu'il fournit, ce qu'il exige et ce qu'il utilise. Le Hub relie automatiquement les services compatibles. |
 | **Workflows** | Tout lien entre services est un workflow visible (Auto, IA ou Manuel). Aucun lien caché. |
