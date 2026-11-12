@@ -199,6 +199,23 @@ const TYPES = {
 // rendue côté serveur : aucun éclair d'une gamme à l'autre au chargement.
 export const GAMMES = ['soma', 'console', 'exploitation', 'lavande'];
 
+// Où se tient le menu : à gauche (le rail d'origine), en haut, en bas ou à
+// droite. La valeur du service (SOCLE_DISPOSITION, posée par le Hub) part
+// dans la page ; la personne peut en choisir une autre, gardée dans son
+// navigateur et posée avant le premier rendu (aucun saut au chargement).
+export const DISPOSITIONS = ['gauche', 'haut', 'bas', 'droite'];
+let dispositionServie = 'gauche';
+export function definirDisposition(d) { dispositionServie = DISPOSITIONS.includes(d) ? d : 'gauche'; }
+const CHOIX_PERSONNEL = "try{var d=localStorage.getItem('socle.disposition');if(/^(gauche|haut|bas|droite)$/.test(d))document.documentElement.setAttribute('data-disposition',d)}catch(e){}";
+/** La page avec sa disposition : celle du service, et le choix de la personne lu avant tout rendu. */
+export function avecDisposition(html, { disposition = dispositionServie, nonce = '' } = {}) {
+  const d = DISPOSITIONS.includes(disposition) ? disposition : 'gauche';
+  let rendu = html.replaceAll('__DISPOSITION__', d).replace(/<html\b([^>]*)>/i, (tout, attributs) =>
+    /\sdata-disposition=/.test(attributs) ? tout : `<html${attributs} data-disposition="${d}" data-disposition-defaut="${d}">`);
+  if (nonce && /^[\w+/=-]{1,200}$/.test(nonce)) rendu = rendu.replace(/<head\b[^>]*>/i, tete => `${tete}<script nonce="${nonce}">${CHOIX_PERSONNEL}</script>`);
+  return rendu;
+}
+
 // Renvoie false si le fichier n'existe pas (l'appelant décide du 404).
 // Fichiers de l'interface sous /v/<version>/ : l'adresse change avec la
 // version, si bien qu'aucun cache — navigateur, Cloudflare, relais — ne
@@ -211,7 +228,7 @@ export function cheminVersionne(chemin, version) {
   return { chemin: m[2], durable: VERSION_SURE.test(String(version)) && m[1] === String(version) };
 }
 
-export function servirFichier(req, res, racine, chemin, { nonce, gamme = 'soma', cache = 'no-cache', version = '' } = {}) {
+export function servirFichier(req, res, racine, chemin, { nonce, gamme = 'soma', disposition = dispositionServie, cache = 'no-cache', version = '' } = {}) {
   let rel;
   try { rel = decodeURIComponent(chemin); } catch { return false; }
   if (rel.includes('\0')) return false;
@@ -225,8 +242,8 @@ export function servirFichier(req, res, racine, chemin, { nonce, gamme = 'soma',
   const type = TYPES[ext];
   if (!type) return false;
   if (ext === '.html') {
-    const html = fs.readFileSync(plein, 'utf8').replaceAll('__NONCE__', nonce || '').replaceAll('__GAMME__', GAMMES.includes(gamme) ? gamme : 'soma')
-      .replaceAll('__VERSION__', VERSION_SURE.test(String(version)) ? String(version) : '0');
+    const html = avecDisposition(fs.readFileSync(plein, 'utf8').replaceAll('__NONCE__', nonce || '').replaceAll('__GAMME__', GAMMES.includes(gamme) ? gamme : 'soma')
+      .replaceAll('__VERSION__', VERSION_SURE.test(String(version)) ? String(version) : '0'), { disposition, nonce });
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(html) });
     res.end(req.method === 'HEAD' ? undefined : html);
     return true;

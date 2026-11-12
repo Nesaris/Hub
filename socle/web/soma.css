@@ -849,6 +849,126 @@ html[data-gamme="lavande"] .toast{border-radius:12px;background:var(--l-bouton);
   html[data-gamme="lavande"] .nav.on::before{left:-16px}
 }
 
+/* Disposition du menu : à gauche (le rail d'origine), en haut, en bas ou à
+   droite, dans toutes les gammes. La valeur vient du service (SOCLE_DISPOSITION,
+   posée par le Hub) ou de la personne : réglages de l'application, ou appui
+   long sur le menu puis glisser vers un bord (disposition.js). */
+html[data-disposition="droite"] .rail{order:9}
+/* En barre : une grille, la barre sur toute la largeur, la page dessous ou
+   dessus, et ce que l'application pose à côté de la page (un panneau) à droite. */
+html:is([data-disposition="haut"],[data-disposition="bas"]) .app{display:grid;grid-template-columns:minmax(0,1fr) auto}
+html[data-disposition="haut"] .app{grid-template-rows:auto minmax(0,1fr)}
+html[data-disposition="bas"] .app{grid-template-rows:minmax(0,1fr) auto}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .app>.rail{grid-column:1/-1}
+html[data-disposition="haut"] .app>.rail{grid-row:1}
+html[data-disposition="bas"] .app>.rail{grid-row:2}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .app>:not(.rail){grid-row:1;min-height:0}
+html[data-disposition="haut"] .app>:not(.rail){grid-row:2}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .app>.main{grid-column:1}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .app>:not(.rail):not(.main){grid-column:2}
+html[data-disposition="droite"] .rail{padding:18px 22px 24px 16px}
+html[data-disposition="droite"]:is([data-gamme="console"],[data-gamme="exploitation"]) .rail{border-right:0;border-left:1px solid var(--hair)}
+
+/* En barre, en haut ou en bas : les groupes sur une ligne, séparés d'un
+   filet, la carte d'état au bout ; ce qui dépasse défile sur place. */
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail{width:auto;height:auto;flex-direction:row;align-items:center;gap:6px;padding:10px var(--gouttiere);overflow-x:auto;overflow-y:hidden;scrollbar-width:none;flex:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail::-webkit-scrollbar{display:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail>*{flex:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .mark{margin:0 12px 0 0;padding:0 4px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .mark .pulse{margin-left:8px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .grp{display:flex;align-items:center;gap:2px;margin:0;width:auto}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .grp>span{display:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .grp~.grp{border-left:1px solid var(--hair);padding-left:8px;margin-left:4px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .nav{width:auto;white-space:nowrap;padding:7px 11px;justify-content:flex-start}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .nav .cnt{margin-left:6px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .nav .cnt:empty{display:none}
+/* Un menu chargé (trois groupes ou plus) : en barre, chaque entrée montre son
+   icône, l'entrée ouverte son nom, et le nom des autres se déplie au survol ou
+   au clavier ; il reste lu par les lecteurs d'écran. */
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail:has(.grp:nth-child(3 of .grp)) .nav:not(.on){gap:0}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail:has(.grp:nth-child(3 of .grp)) .nav:not(.on)>span:not(.cnt){max-width:0;opacity:0;transition:max-width .22s var(--courbe),opacity .18s,margin .22s}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail:has(.grp:nth-child(3 of .grp)) .nav:not(.on):is(:hover,:focus-visible){gap:9px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .rail:has(.grp:nth-child(3 of .grp)) .nav:not(.on):is(:hover,:focus-visible)>span:not(.cnt){max-width:14em;opacity:1}
+html[data-disposition="haut"][data-gamme="exploitation"] .nav.on::before{left:50%;top:auto;bottom:2px;width:14px;height:2px;margin:0 0 0 -7px}
+html[data-disposition="bas"][data-gamme="exploitation"] .nav.on::before{left:50%;top:2px;width:14px;height:2px;margin:0 0 0 -7px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .railcard{margin:0 0 0 auto;display:flex;align-items:center;gap:16px;padding:7px 12px;border-radius:10px}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .railcard .row{margin:0;flex:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .railcard .bar{display:none}
+html:is([data-disposition="haut"],[data-disposition="bas"]) .railcard b{margin-left:4px}
+html[data-disposition="haut"]:is([data-gamme="console"],[data-gamme="exploitation"]) .rail{border-right:0;border-bottom:1px solid var(--hair)}
+html[data-disposition="bas"]:is([data-gamme="console"],[data-gamme="exploitation"]) .rail{border-right:0;border-top:1px solid var(--hair)}
+html[data-disposition="bas"] .rail{padding-bottom:max(10px,env(safe-area-inset-bottom,0px))}
+
+/* Lavande : la barre sombre reste détachée du bord, l'indicateur blanc suit
+   le côté où elle se tient. */
+html[data-gamme="lavande"][data-disposition="droite"] nav.rail{margin:14px 14px 14px 0}
+html[data-gamme="lavande"][data-disposition="droite"] .nav.on::before{left:auto;right:-14px;border-radius:4px 0 0 4px}
+html[data-gamme="lavande"]:is([data-disposition="haut"],[data-disposition="bas"]) nav.rail{border-radius:26px;padding:10px 12px 10px 18px;box-shadow:var(--lift-hi)}
+html[data-gamme="lavande"][data-disposition="haut"] nav.rail{margin:14px 14px 0}
+html[data-gamme="lavande"][data-disposition="bas"] nav.rail{margin:0 14px 14px;padding-bottom:max(10px,env(safe-area-inset-bottom,0px))}
+html[data-gamme="lavande"]:is([data-disposition="haut"],[data-disposition="bas"]) .grp~.grp{border-left-color:var(--l-rail-survol)}
+html[data-gamme="lavande"][data-disposition="haut"] .nav.on::before{left:50%;top:auto;bottom:-10px;width:22px;height:4px;margin:0 0 0 -11px;border-radius:4px 4px 0 0}
+html[data-gamme="lavande"][data-disposition="bas"] .nav.on::before{left:50%;top:-10px;bottom:auto;width:22px;height:4px;margin:0 0 0 -11px;border-radius:0 0 4px 4px}
+
+@media (max-width:1100px){
+  html[data-disposition="droite"] .rail{padding:22px 12px}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .rail{padding:8px var(--gouttiere);align-items:center}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .mark{margin:0 8px 0 0}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .nav span{display:revert}
+}
+@media (max-width:760px){
+  /* À droite : le tiroir sort du bord droit. */
+  html[data-disposition="droite"] .rail{left:auto;right:0;transform:translateX(100%)}
+  html[data-disposition="droite"] .app.menu-ouvert .rail{transform:none}
+  html[data-disposition="droite"] .top .menu{order:99}
+  html[data-gamme="lavande"][data-disposition="droite"] nav.rail{margin:0;border-radius:26px 0 0 26px}
+  html[data-gamme="lavande"][data-disposition="droite"] .nav.on::before{right:-16px}
+  /* En barre : toujours visible, sans tiroir ni bouton de menu. */
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .rail{position:relative;inset:auto;transform:none;transition:none;width:auto;box-shadow:none;flex-direction:row;align-items:center;padding:8px 12px}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .mark{padding:0;margin:0 6px 0 0}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) :is(.mark b,.mark .pulse,.grp>span,.railcard){display:none}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .nav{padding:8px 10px}
+  html:is([data-disposition="haut"],[data-disposition="bas"]) .top .menu,html:is([data-disposition="haut"],[data-disposition="bas"]) .voile-rail{display:none!important}
+  html[data-disposition="bas"] .rail{padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  html[data-gamme="lavande"]:is([data-disposition="haut"],[data-disposition="bas"]) nav.rail{border-radius:22px;padding:8px 10px}
+  html[data-gamme="lavande"][data-disposition="haut"] nav.rail{margin:10px 10px 0}
+  html[data-gamme="lavande"][data-disposition="bas"] nav.rail{margin:0 10px 10px;padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+}
+
+/* Déplacer le menu : appui long, puis glisser vers un bord. */
+.rail{-webkit-touch-callout:none}
+.rail.disposition-arme{transition:transform .25s var(--courbe),opacity .25s;transform:scale(.99)}
+html.disposition-en-cours,html.disposition-en-cours *{cursor:grabbing!important;user-select:none!important;-webkit-user-select:none!important}
+html.disposition-en-cours .rail{opacity:.45}
+.disposition-glisser{position:fixed;inset:0;z-index:1000;pointer-events:none;background:color-mix(in srgb,var(--ink) 8%,transparent)}
+.disposition-glisser .zone{position:absolute;display:flex;align-items:center;justify-content:center;border:2px dashed color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 6%,transparent);border-radius:16px;transition:background .15s,border-color .15s}
+.disposition-glisser .zone span{background:var(--surface);color:var(--ink);padding:5px 11px;border-radius:9px;box-shadow:var(--lift);font-size:12.5px;font-weight:500;white-space:nowrap}
+.disposition-glisser .zone.vise{background:color-mix(in srgb,var(--accent) 20%,transparent);border:2px solid var(--accent)}
+.disposition-glisser .zone[data-d="gauche"]{left:10px;top:10px;bottom:10px;width:min(110px,22vw)}
+.disposition-glisser .zone[data-d="droite"]{right:10px;top:10px;bottom:10px;width:min(110px,22vw)}
+.disposition-glisser .zone[data-d="haut"]{top:10px;left:calc(min(110px,22vw) + 20px);right:calc(min(110px,22vw) + 20px);height:72px}
+.disposition-glisser .zone[data-d="bas"]{bottom:10px;left:calc(min(110px,22vw) + 20px);right:calc(min(110px,22vw) + 20px);height:72px}
+.disposition-glisser .fantome{position:fixed;left:0;top:0;padding:8px 13px;border-radius:12px;background:var(--ink);color:var(--paper);font-size:12.5px;font-weight:500;box-shadow:var(--lift-hi);transform:translate(-50%,-140%);white-space:nowrap}
+.disposition-glisser .aide{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--surface);color:var(--ink-soft);padding:9px 14px;border-radius:12px;box-shadow:var(--lift);font-size:12.5px;text-align:center;max-width:min(320px,80vw)}
+
+/* Le bouton de la barre du haut et sa petite fenêtre. */
+.bouton-disposition svg{width:20px;height:15px}
+.fenetre-disposition{position:fixed;z-index:900;width:min(330px,calc(100vw - 16px));background:var(--surface);color:var(--ink);border-radius:var(--r-carte,14px);box-shadow:var(--lift-hi),0 0 0 1px var(--hair-soft);padding:14px;display:grid;gap:10px}
+.fenetre-disposition>b{font-size:13.5px;font-weight:600}
+.fenetre-disposition>small{font-size:11.5px;color:var(--muted)}
+.fenetre-disposition .choix-disposition{grid-template-columns:repeat(2,minmax(0,1fr))}
+.fenetre-disposition .choix-disposition button:first-child{grid-column:1/-1;flex-direction:row;justify-content:center}
+html[data-gamme="lavande"] .fenetre-disposition{background:var(--l-verre);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px)}
+
+/* Le choix dans les réglages : un schéma par position. */
+.choix-disposition{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,96px),1fr));gap:8px}
+.choix-disposition button{display:flex;flex-direction:column;align-items:center;gap:7px;padding:11px 8px 9px;border-radius:var(--r-ctl,10px);background:var(--surface);border:1px solid var(--hair);color:var(--muted);font-size:12.5px;min-width:0}
+.choix-disposition button:hover{border-color:var(--ink-soft);color:var(--ink-soft)}
+.choix-disposition button[aria-checked="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);color:var(--ink);background:var(--wash)}
+.choix-disposition button[aria-checked="true"] .barre{fill:var(--accent)}
+.choix-disposition button span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.choix-disposition svg{display:block}
+
 /* Un secret dévoilé : à côté de son bouton, en chasse fixe, sélectionnable d'un
    coup, et jamais coupé en « … » — on le dévoile pour le copier. */
 .devoiler{display:inline-flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}

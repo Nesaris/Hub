@@ -29,7 +29,7 @@ test('SOCLE_THEME : soma par défaut, console, exploitation et lavande admises, 
 });
 
 test('la page est rendue avec sa gamme ; une gamme inconnue retombe sur SOMA', () => {
-  assert.equal(rendre('console'), '<html data-gamme="console"><script nonce="n0"></script></html>');
+  assert.equal(rendre('console'), '<html data-gamme="console" data-disposition="gauche" data-disposition-defaut="gauche"><script nonce="n0"></script></html>');
   assert.match(rendre(undefined), /data-gamme="soma"/);
   assert.match(rendre('"><script>'), /data-gamme="soma"/);
 });

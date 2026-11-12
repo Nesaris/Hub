@@ -8,7 +8,7 @@ import { Journal } from './journal.js';
 import { Limiteur } from './limiteur.js';
 import { Comptes } from './comptes.js';
 import { Portail } from './portail.js';
-import { GAMMES, listeConfiance } from './http.js';
+import { GAMMES, DISPOSITIONS, definirDisposition, listeConfiance } from './http.js';
 import { Postier, adresseValide } from './courriel.js';
 import { notificateur } from './notifications.js';
 import { Vigie } from './vigie.js';
@@ -67,6 +67,9 @@ export const SPEC_SOCLE = {
   smtpAutorite: { env: 'SOCLE_SMTP_AUTORITE', type: 'chaine' },
   // Gamme de l'interface (SOMA, Console, Exploitation ou Lavande) : posée par le Hub pour tous les services qui l'acceptent.
   gamme: { env: 'SOCLE_THEME', type: 'choix', parmi: GAMMES, defaut: 'soma' },
+  // Où se tient le menu (à gauche, en haut, en bas, à droite) : posée par le Hub,
+  // et chaque personne peut en choisir une autre dans l'application.
+  disposition: { env: 'SOCLE_DISPOSITION', type: 'choix', parmi: DISPOSITIONS, defaut: 'gauche' },
   // Administration des comptes déléguée au Hub : jeton à lui seul, généré par
   // le Hub, distinct du jeton de service. Absent : aucune délégation.
   jetonAdminHub: { env: 'SOCLE_JETON_ADMIN_HUB', type: 'secret', min: 32 },
@@ -101,6 +104,7 @@ function controlerEnsemble(cfg) {
 export async function demarrerSocle({ service, db, dossier, env = process.env, log = console, notifier = null, maintenant, migrer = null, assistant = null, version = null, nouveautes = null }) {
   const cfg = lireConfig(SPEC_SOCLE, env);
   controlerEnsemble(cfg);
+  definirDisposition(cfg.disposition);
   reglerArgon({ m: cfg.argonM, t: cfg.argonT, p: cfg.argonP, poivre: cfg.poivre, poivreAncien: cfg.poivreAncien });
   const coffre = new Coffre({ cle: cfg.cle, fichier: path.join(dossier, 'cles', 'socle.key'), ancienne: cfg.cleAncienne });
   // Chaque ligne du journal part aussi sur la sortie standard : les journaux du
