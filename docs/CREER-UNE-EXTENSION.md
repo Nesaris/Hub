@@ -43,6 +43,8 @@ L'API est toujours appelée via `{{service.url}}`, avec le jeton `{{service.toke
 | `{{hub.network}}` | Réseau Docker partagé (`hub_net`), à déclarer `external: true`. |
 | `{{hub.tz}}` | Fuseau de l'utilisateur (donné par son navigateur), `UTC` à défaut. À passer en `TZ`. |
 | `{{hub.theme}}` | Gamme de l'interface choisie pour ce service dans la page Thème (`soma` ou `console`) : la gamme commune, ou celle choisie pour lui. À passer en `SOCLE_THEME` : quand elle change, le Hub redéploie chaque service dont la pile pose `SOCLE_THEME`. Un service qui ne la lit pas garde son apparence. |
+| `{{hub.gamme}}`, `{{hub.apparence}}` | La même gamme, avec Exploitation (`{{hub.gamme}}`), ou avec toutes les gammes, Lavande comprise (`{{hub.apparence}}`, socle qui la connaît). |
+| `{{hub.disposition}}` | Position du menu choisie pour ce service dans la page Thème : `gauche`, `haut`, `bas` ou `droite`. À passer en `SOCLE_DISPOSITION` (socle 3aac596 et plus) : quand elle change, le Hub redéploie chaque service dont la pile pose `SOCLE_DISPOSITION`. Chaque personne peut en choisir une autre dans l'application. Demande au moins le Hub 0.17.0. |
 
 Le conteneur doit rejoindre `{{hub.network}}` et porter `container_name: {{service.host}}`.
 

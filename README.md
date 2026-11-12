@@ -35,7 +35,7 @@ Point central de tes services auto-hébergés. Le Hub installe tes services depu
 |:--:|
 | Le thème : une gamme pour tout, ou une par service |
 
-Quatre gammes d’interface au choix — SOMA, Console, Exploitation, Lavande — en clair ou en sombre, de 360 à 1920 px de large.
+Quatre gammes d’interface au choix — SOMA, Console, Exploitation, Lavande — en clair ou en sombre, de 360 à 1920 px de large, avec le menu à gauche, en haut, en bas ou à droite.
 
 ## Installation
 
@@ -152,6 +152,8 @@ Garde l'ancienne clé hors ligne, avec les sauvegardes faites sous elle : une ba
 Tous les réglages de démarrage passent par `.env` (voir `.env.example`). Une valeur invalide arrête le Hub au démarrage avec la liste des erreurs.
 
 L'apparence se règle dans l'interface, page Thème : SOMA (fond papier ou sombre, accent bleu) ou Console (noir et vert, ou blanc et bleu, en Geist). Un thème pour tout, ou un par service, le Hub compris. Les services qui lisent le thème et dont la gamme change sont redéployés pour la recevoir ; Oracle et SYNAPSE gardent la leur. Clair ou sombre se règle dans chaque interface.
+
+La même page règle la position du menu : à gauche, en haut, en bas ou à droite, pour tout ou par service. Un service la reçoit par `{{hub.disposition}}` (posé en `SOCLE_DISPOSITION`) et est redéployé quand elle change. Chaque personne peut ensuite en choisir une autre pour elle, dans chaque application : le bouton à côté de la bascule clair ou sombre, ou un appui long sur le menu puis glisser vers un bord. Ce choix reste dans son navigateur et s'applique avant le premier affichage.
 
 | Préfixe | Rôle |
 | --- | --- |

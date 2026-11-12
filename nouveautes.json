@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.17.0",
+    "date": "2026-11-12",
+    "points": [
+      "Le menu se place à gauche, en haut, en bas ou à droite, dans les quatre gammes : page Thème pour tout ou par service, et chacun peut choisir la sienne (bouton à côté de clair ou sombre, ou appui long sur le menu puis glisser vers un bord)."
+    ]
+  },
+  {
     "version": "0.16.0",
     "date": "2026-11-12",
     "points": [
