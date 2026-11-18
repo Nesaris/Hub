@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.17.1",
+    "date": "2026-11-18",
+    "points": [
+      "Le Hub ne se fige plus et ne remonte plus en haut de la page pendant une mise à jour : chaque repeint de la page Extensions ajoutait une écoute de plus.",
+      "« Mettre à jour » installe la toute dernière version publiée : une version sortie entre deux actualisations du catalogue ne rallume plus le bouton juste après."
+    ]
+  },
+  {
     "version": "0.17.0",
     "date": "2026-11-12",
     "points": [
