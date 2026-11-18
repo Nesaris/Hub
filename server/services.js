@@ -620,7 +620,10 @@ export class Services {
    * le manifeste change (le service se met à jour sur sa machine).
    */
   async update(idOrName, actor) {
-    const inst = this.get(idOrName);
+    let inst = this.get(idOrName);
+    // La toute dernière version publiée, pas celle de la dernière actualisation.
+    try { await this.registry?.rafraichirEntree?.(inst.ext_id); } catch (e) { log.warn('services', `${inst.name} : manifeste non relu avant la mise à jour — ${e.message}`); }
+    inst = this.get(inst.id);
     const remplacant = this.registry?.remplacantDe?.(inst.ext_id);
     if (remplacant) return this.remplacer(inst, remplacant, actor);
     // Seule l'image locale est plus récente : on la démarre, sans retélécharger

@@ -316,6 +316,27 @@ export class Registry {
     manifest.id, src.label, manifest.version, JSON.stringify(manifest), JSON.stringify({ ...origin, composeSha256: e.composeSha256 || null }), Date.now());
   }
 
+  /**
+   * Relit le manifeste d'une seule extension, au dernier commit de sa branche,
+   * juste avant une mise à jour : sinon « Mettre à jour » installait la
+   * version vue à la dernière actualisation (jusqu'à deux minutes plus tôt),
+   * et une version publiée entre-temps rallumait le bouton aussitôt après.
+   * Seulement pour un compte GitHub lu en entier (github-user:) : un index
+   * avec empreintes se relit avec son index.
+   */
+  async rafraichirEntree(id) {
+    const row = this.db.get('SELECT source, version, origin FROM catalog WHERE id=?', id);
+    if (!row || !String(row.source).startsWith('github-user:') || !this.sources().includes(row.source)) return false;
+    let o;
+    try { o = JSON.parse(row.origin || '{}'); } catch { return false; }
+    if (o.type !== 'github' || !o.repo) return false;
+    const fichier = o.dir ? `${o.dir}/hub.json` : 'hub.json';
+    await this.load({ label: row.source }, null, { id, repo: o.repo, ref: o.ref || 'main', manifest: fichier });
+    const apres = this.db.get('SELECT version FROM catalog WHERE id=?', id)?.version;
+    if (apres !== row.version) this.bus?.emit('catalog', { id, version: apres });
+    return true;
+  }
+
   check(manifest) {
     const r = validateManifest(manifest);
     if (!r.valid) throw new HttpError(400, 'Manifeste invalide', r.errors.slice(0, 20));
