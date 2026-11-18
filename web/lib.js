@@ -2,10 +2,35 @@
 // Tout le rendu passe par les gabarits du socle : une valeur y devient du
 // texte, un attribut ou un nœud, jamais du balisage.
 import { Api, toast as toastSocle } from '/socle/compte.js';
-import { html, poser, rendre, element } from '/socle/gabarit.js';
+import { html, poser as poserSocle, rendre, element } from '/socle/gabarit.js';
 import { I } from './icons.js';
 
-export { html, poser, rendre, element };
+export { html, rendre, element };
+
+/* Repeindre une page déjà affichée sans la faire sauter. Une page qui se
+   relit seule (vue d'ensemble, services pendant une mise à jour) remplace
+   tout son contenu : pendant un instant, ses graphiques n'ont pas encore leur
+   hauteur, la page raccourcit, le navigateur ramène le défilement plus haut
+   et ne le rend jamais. La page garde donc sa hauteur le temps que le
+   nouveau contenu prenne la sienne, et le défilement reste où il était. */
+const tenue = new WeakMap();
+export function poser(el, ...contenus) {
+  const zone = el?.isConnected && el.firstChild ? el.closest('#stage') : null;
+  if (!zone) return poserSocle(el, ...contenus);
+  const y = zone.scrollTop;
+  el.style.minHeight = `${el.offsetHeight}px`;
+  poserSocle(el, ...contenus);
+  zone.scrollTop = y;
+  clearTimeout(tenue.get(el));
+  tenue.set(el, setTimeout(() => { el.style.minHeight = ''; }, 900));
+  return el;
+}
+
+/* Quand la personne fait défiler la page : une relecture automatique attend
+   qu'elle s'arrête, au lieu de repeindre sous ses doigts. */
+let dernierDefilement = 0;
+addEventListener('scroll', () => { dernierDefilement = Date.now(); }, { capture: true, passive: true });
+export const defileEncore = (ms = 1200) => Date.now() - dernierDefilement < ms;
 export const $ = (s, root = document) => root.querySelector(s);
 export const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 

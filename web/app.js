@@ -5,7 +5,7 @@ import { porte, pageSecurite, pageComptes, basculeTheme, appliquerTheme, icone, 
 import { courbe, jauge, calendrier } from '/socle/graphes.js';
 import { installerDisposition, controleDisposition, choisirDisposition, choixPersonnel, schemaDisposition, LIBELLES_DISPOSITION } from '/socle/disposition.js';
 import { I, P } from './icons.js';
-import { $, $$, html, poser, rendre, element, api, session, GET, POST, PUT, PATCH, DEL, toast, fail, pulse, modal, confirmBox, formulaire, readForm, bindDynamic, when, sparkSvg, statusTag, originChip, ecouterApercu } from './lib.js';
+import { $, $$, html, poser, rendre, element, defileEncore, api, session, GET, POST, PUT, PATCH, DEL, toast, fail, pulse, modal, confirmBox, formulaire, readForm, bindDynamic, when, sparkSvg, statusTag, originChip, ecouterApercu } from './lib.js';
 import { openEditor } from './editor.js';
 import { basculerVoix, monter as monterVoix, tourVocal, rejouer, arreter as arreterVoix, brancher as brancherVoix } from './voix.js';
 import { surveiller as surveillerListes } from './choix.js';
@@ -56,8 +56,14 @@ const S = { page: 'dash', wf: null, aiOpen: false, filter: 'all', extTab: 'catal
 // Événements temps réel
 const listeners = new Map();
 let scoped = [];
+// Une page qui se repeint en se rappelant elle-même posait une écoute de
+// plus à chaque repeint : à chaque événement, deux fois plus de repeints. Une
+// mise à jour en envoie des dizaines, l'onglet finissait figé. « une » ne pose
+// qu'une écoute par page ouverte et par nom.
+const unes = new Set();
 const app = {
   on(ev, fn) { if (!listeners.has(ev)) listeners.set(ev, new Set()); listeners.get(ev).add(fn); scoped.push([ev, fn]); },
+  une(cle, ev, fn) { const k = `${navToken}:${cle}`; if (unes.has(k)) return; unes.add(k); this.on(ev, fn); },
   go(page, arg) { navigate(page, arg); },
 };
 let es;
@@ -179,7 +185,10 @@ async function annoncerMisesAJour() {
     toast(neuves.length === 1 ? (neuves[0].imageNeuve ? `Mise à jour disponible : nouvelle image de ${neuves[0].ext.name} construite sur la machine` : (neuves[0].remplacePar ? `Mise à jour disponible : ${neuves[0].ext.name} devient ${neuves[0].remplacePar.name} ${neuves[0].miseAJour}` : `Mise à jour disponible : ${neuves[0].ext.name} ${neuves[0].miseAJour} (installé : ${neuves[0].version})`)) : `${neuves.length} mises à jour disponibles — Extensions → Mes services`);
     try { sessionStorage.setItem('hub_maj_vues', JSON.stringify([...vues, ...neuves.map(i => `${i.id}@${i.miseAJour}`)].slice(-50))); } catch { /* stockage indisponible */ }
   }
-  if (S.page === 'ext') navigate('ext');
+  // La page Extensions ouverte se repeint sur place : naviguer à nouveau la
+  // ramenait en haut, au milieu d'une lecture, après chaque actualisation du
+  // catalogue ou mise à jour.
+  if (S.page === 'ext' && $('#page')) viewExt($('#page'), navToken).catch(() => {});
 }
 function peindreCompteExt(inst) {
   const c = $('[data-cnt="ext"]'); if (!c) return;
@@ -261,6 +270,7 @@ let navToken = 0;
 async function navigate(page, arg) {
   for (const [ev, fn] of scoped) listeners.get(ev)?.delete(fn);
   scoped = [];
+  unes.clear();
   window.onbeforeunload = null;
   if (!navVisible(page)) page = 'dash';
   S.page = page; if (page === 'editor') S.wf = arg;
@@ -322,9 +332,9 @@ async function viewDash(el, t) {
   };
   peindre(); brancherDash(el, relire);
   let attente = null;
-  const bientot = () => { clearTimeout(attente); attente = setTimeout(() => alive(t) && relire(), 1500); };
+  const bientot = () => { clearTimeout(attente); attente = setTimeout(() => { if (!alive(t)) return; if (document.hidden || defileEncore()) return bientot(); relire(); }, 1500); };
   for (const ev of ['instance', 'approval', 'probe', 'execution', 'audit']) app.on(ev, bientot);
-  const minute = setInterval(() => { if (!alive(t)) clearInterval(minute); else if (!document.hidden) relire(); }, 60e3);
+  const minute = setInterval(() => { if (!alive(t)) clearInterval(minute); else if (!document.hidden) bientot(); }, 60e3);
 }
 
 function contenuDash(o, m) {
@@ -608,14 +618,11 @@ async function viewExt(el, t) {
   }).catch(fail); });
   if ($('#depotsTous', el)) $('#depotsTous', el).onclick = () => { S.depotsTous = !S.depotsTous; viewExt(el, t); };
   // L'état des adaptations arrive par les événements : une seule écoute par page, et un seul repeint par rafale.
-  if (S.ecouteRegistres !== t) {
-    S.ecouteRegistres = t;
-    let attente = null;
-    app.on('catalog', () => { clearTimeout(attente); attente = setTimeout(() => alive(t) && S.extTab === 'sources' && viewExt(el, t), 500); });
-  }
+  let attenteCatalogue = null, attenteService = null;
+  app.une('ext:catalog', 'catalog', () => { clearTimeout(attenteCatalogue); attenteCatalogue = setTimeout(() => alive(t) && S.extTab === 'sources' && viewExt(el, t), 500); });
   bindCommon(el);
   if ($('#import', el)) $('#import', el).onclick = async () => { try { const m = JSON.parse($('#manifest', el).value); await POST('/api/catalog/import', { manifest: m }); toast('Manifeste importé'); S.extTab = 'catalog'; viewExt(el, t); } catch (e) { fail(e); } };
-  app.on('instance', () => alive(t) && S.extTab === 'installed' && viewExt(el, t));
+  app.une('ext:instance', 'instance', () => { clearTimeout(attenteService); attenteService = setTimeout(() => alive(t) && S.extTab === 'installed' && viewExt(el, t), 400); });
 }
 
 /* Le fil d'une installation ou d'une mise à jour, étape par étape. */
@@ -961,7 +968,7 @@ async function viewWf(el, t) {
     }
   }; });
   $('#newWf', el).onclick = async () => { try { const r = await POST('/api/workflows', { name: 'Nouveau workflow' }); navigate('editor', r.workflow.id); } catch (e) { fail(e); } };
-  app.on('workflow', () => alive(t) && viewWf(el, t));
+  app.une('wf', 'workflow', () => alive(t) && viewWf(el, t));
 }
 
 // Les actions retirées d'un écran étroit, une par ligne.
@@ -1300,7 +1307,7 @@ async function viewProbes(el, t) {
     c.onkeydown = e => { if (e.key === 'Enter') ouvrir(); };
   });
   let pend;
-  app.on('probe', () => { clearTimeout(pend); pend = setTimeout(() => alive(t) && !document.querySelector('.voile') && viewProbes(el, t), 1500); });
+  app.une('sondes', 'probe', () => { clearTimeout(pend); pend = setTimeout(() => alive(t) && !document.querySelector('.voile') && viewProbes(el, t), 1500); });
 }
 async function probeDialog(p) {
   const draw = async (me, hours) => {
@@ -1659,7 +1666,7 @@ async function viewJournal(el, t) {
   };
   peindre();
   let pend;
-  app.on('audit', () => { clearTimeout(pend); pend = setTimeout(() => alive(t) && viewJournal(el, t), 1000); });
+  app.une('journal', 'audit', () => { clearTimeout(pend); pend = setTimeout(() => alive(t) && viewJournal(el, t), 1000); });
 }
 
 // Thème : deux onglets. « Thème global » choisit la gamme commune ; « Par
