@@ -22,7 +22,7 @@
 
 </p>
 
-<p align="center"><a href="README.fr.md">🇫🇷 Documentation complète en français</a> · <a href="https://nesaris.github.io">Nesaris Network</a></p>
+<p align="center"><a href="README.fr.md">Full documentation</a> · <a href="https://nesaris.github.io">Nesaris Network</a></p>
 
 ## Why Hub?
 
@@ -52,7 +52,7 @@ git clone https://github.com/Nesaris/Hub hub && cd hub && sudo ./install.sh
 
 The script installs Docker if needed, creates the master keys, builds and starts the Hub on `127.0.0.1:8100`, and prints the one-time setup token. Put an HTTPS reverse proxy in front (Caddy, Traefik, [Relay](https://github.com/Nesaris/Relay), Cloudflare Tunnel) to reach it from your network.
 
-Full documentation (configuration, backups, key rotation, reverse proxy, upgrades) is in **[README.fr.md](README.fr.md)** (French).
+Full documentation (configuration, backups, key rotation, reverse proxy, upgrades) is in **[README.fr.md](README.fr.md)**.
 
 ## Part of Nesaris Network
 
