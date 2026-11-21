@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.17.2",
+    "date": "2026-11-21",
+    "points": [
+      "Sécurité : avant de démarrer une extension, le Hub inspecte le Compose tel que Docker le lit lui-même et refuse tout privilège ou accès à l'hôte non déclaré (privileged, socket Docker, espaces de noms de l'hôte, périphériques, montages hôte, security_opt affaiblis) — y compris déguisés par des astuces d'écriture. Une extension malveillante ou compromise ne peut plus s'échapper de son conteneur."
+    ]
+  },
+  {
     "version": "0.17.1",
     "date": "2026-11-18",
     "points": [
