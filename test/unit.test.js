@@ -92,7 +92,7 @@ test('comparaisons', () => {
 });
 
 // ---- permissions d'installation ----
-const { checkCompose, sensitivePermissions } = await import('../server/services.js');
+const { checkCompose, verifierModele, sensitivePermissions } = await import('../server/services.js');
 
 test('permissions : privileged et socket Docker toujours refusés', () => {
   const m = { permissions: { hostNetwork: true, capAdd: ['NET_RAW'] } };
@@ -111,6 +111,61 @@ test('permissions : capacités limitées à celles déclarées', () => {
   assert.throws(() => checkCompose(compose, { permissions: { capAdd: ['NET_RAW'] } }), /NET_ADMIN/);
   assert.equal(checkCompose(compose, { permissions: { capAdd: ['NET_RAW', 'NET_ADMIN'] } }), true);
   assert.throws(() => checkCompose('services:\n  a:\n    cap_add:\n      - SYS_ADMIN\n', { permissions: { capAdd: ['SYS_ADMIN'] } }), /jamais accordée/);
+});
+
+test('garde-fou texte : contournements fermés (casse, yes/on, /run, flow, lowercase)', () => {
+  const ok = { permissions: {} };
+  assert.throws(() => checkCompose('services:\n  a:\n    privileged: True\n', ok), /privileged/);
+  assert.throws(() => checkCompose('services:\n  a:\n    privileged: yes\n', ok), /privileged/);
+  assert.throws(() => checkCompose('services:\n  a:\n    volumes: ["/run/docker.sock:/x"]\n', ok), /socket Docker/);
+  assert.throws(() => checkCompose('services:\n  a:\n    volumes: ["/run/containerd/containerd.sock:/x"]\n', ok), /socket Docker/);
+  assert.throws(() => checkCompose('services:\n  a:\n    cap_add: [SYS_ADMIN]\n', ok), /jamais accordée/);
+  assert.throws(() => checkCompose('services:\n  a:\n    cap_add: ["net_admin"]\n', ok), /NET_ADMIN/);
+  assert.throws(() => checkCompose('services:\n  a:\n    pid: host\n', ok), /espace de noms/);
+});
+
+// Le contrôle qui fait autorité : sur le modèle normalisé par Docker, donc
+// insensible aux astuces YAML. On lui donne directement l'objet normalisé.
+test('verifierModele : toute évasion de conteneur est refusée', () => {
+  const nu = { permissions: {} };
+  const svc = s => ({ services: { a: { image: 'x', ...s } } });
+  // privilège sous toutes ses formes
+  assert.throws(() => verifierModele(svc({ privileged: true }), nu), /privileged/);
+  assert.throws(() => verifierModele(svc({ privileged: 'true' }), nu), /privileged/);
+  // espaces de noms de l'hôte
+  for (const k of ['pid', 'ipc', 'uts', 'cgroup', 'userns_mode']) {
+    assert.throws(() => verifierModele(svc({ [k]: 'host' }), nu), /hôte/);
+  }
+  // réseau hôte : refusé sauf déclaration
+  assert.throws(() => verifierModele(svc({ network_mode: 'host' }), nu), /hostNetwork/);
+  assert.equal(verifierModele(svc({ network_mode: 'host' }), { permissions: { hostNetwork: true } }), true);
+  // capacités : interdites, et non déclarées
+  assert.throws(() => verifierModele(svc({ cap_add: ['SYS_ADMIN'] }), { permissions: { capAdd: ['SYS_ADMIN'] } }), /jamais accordée/);
+  assert.throws(() => verifierModele(svc({ cap_add: ['CAP_NET_ADMIN'] }), nu), /NET_ADMIN/);
+  assert.equal(verifierModele(svc({ cap_add: ['NET_ADMIN'] }), { permissions: { capAdd: ['net_admin'] } }), true);
+  // security_opt affaiblissant l'isolement
+  for (const o of ['seccomp=unconfined', 'apparmor:unconfined', 'label:disable', 'systempaths=unconfined']) {
+    assert.throws(() => verifierModele(svc({ security_opt: [o] }), nu), /isolement/);
+  }
+  assert.equal(verifierModele(svc({ security_opt: ['no-new-privileges:true'] }), nu), true);
+  // périphériques hôte
+  assert.throws(() => verifierModele(svc({ devices: ['/dev/sda:/dev/sda'] }), nu), /périphérique/);
+  assert.throws(() => verifierModele(svc({ device_cgroup_rules: ['c 1:3 rwm'] }), nu), /device_cgroup/);
+  // montages hôte (forme longue normalisée par Docker)
+  const bind = (source, target = '/x') => svc({ volumes: [{ type: 'bind', source, target }] });
+  assert.throws(() => verifierModele(bind('/'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/var/run/docker.sock'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/run/docker.sock'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/etc'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/var/lib/docker'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/root/.ssh'), nu), /sensible/);
+  assert.throws(() => verifierModele(bind('/srv/data'), nu), /volumes nommés/); // bind hôte non sensible : refusé aussi
+  // build interdit (l'image passe par le registre ou la construction du Hub)
+  assert.throws(() => verifierModele({ services: { a: { build: '.' } } }, nu), /build/);
+  // volume nommé « bind déguisé »
+  assert.throws(() => verifierModele({ services: { a: { image: 'x', volumes: [{ type: 'volume', source: 'd', target: '/d' }] } }, volumes: { d: { driver: 'local', driver_opts: { type: 'none', o: 'bind', device: '/' } } } }, nu), /montage de l’hôte/);
+  // cas légitime : volume nommé + tmpfs + no-new-privileges
+  assert.equal(verifierModele({ services: { a: { image: 'x', volumes: [{ type: 'volume', source: 'data', target: '/data' }, { type: 'tmpfs', target: '/tmp' }], security_opt: ['no-new-privileges:true'], read_only: true } }, volumes: { data: { name: 'hub-x-data' } } }, nu), true);
 });
 
 test('permissions : liste présentée à l’utilisateur', () => {

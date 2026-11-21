@@ -67,6 +67,15 @@ export const docker = {
   pull: (project, file) => run(['compose', '-p', project, '-f', file, 'pull', '--policy', 'missing'], { timeout: 900000 }),
   down: (project, file, volumes) => run(['compose', '-p', project, '-f', file, 'down', ...(volumes ? ['-v'] : [])], { timeout: 300000 }),
   config: (file) => run(['compose', '-f', file, 'config', '-q'], { timeout: 30000 }),
+  // Le modèle normalisé d'un Compose, tel que Docker le lit (volumes en forme
+  // longue, booléens résolus, ancres et alias aplatis) : c'est ce qui est
+  // réellement exécuté, et donc ce qu'on inspecte avant de démarrer. Rendu
+  // côté client, sans toucher au démon ; interpolation « ${} » laissée telle
+  // quelle (seule la structure compte pour le contrôle de sécurité).
+  async configModele(file) {
+    const json = await run(['compose', '-f', file, 'config', '--no-interpolate', '--format', 'json'], { timeout: 30000 });
+    try { return JSON.parse(json); } catch { throw new HttpError(400, 'Compose illisible : modèle normalisé non analysable.'); }
+  },
   async volumeExiste(nom) { try { await run(['volume', 'inspect', nom], { timeout: 15000 }); return true; } catch { return false; } },
   supprimerVolume: nom => run(['volume', 'rm', nom], { timeout: 60000 }),
   async imageDuConteneur(conteneur) { return (await run(['inspect', '--format', '{{.Image}}', conteneur], { timeout: 15000 })).trim() || null; },

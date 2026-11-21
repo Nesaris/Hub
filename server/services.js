@@ -303,20 +303,85 @@ export function renderCompose(tpl, vars) {
   });
 }
 
+// Garde-fou de texte, rapide : un premier refus avant même d'écrire le fichier.
+// Il est volontairement large (insensible à la casse, aux formes « yes/on », au
+// style « flow », aux deux chemins du socket) pour recaler l'évident tôt ; le
+// contrôle qui fait autorité est verifierModele(), sur le Compose que Docker a
+// normalisé lui-même — insensible, lui, aux ancres et alias YAML.
 export function checkCompose(rendered, m) {
   const p = m.permissions || {};
-  if (/privileged:\s*true/.test(rendered)) throw new HttpError(400, 'Compose refusé : privileged n’est jamais accordé.');
-  if (/\/var\/run\/docker\.sock/.test(rendered)) throw new HttpError(400, 'Compose refusé : le socket Docker ne doit pas être monté. Utilise permissions.dockerSocket = proxy.');
-  if (/network_mode:\s*["']?host/.test(rendered) && !p.hostNetwork) {
+  if (/privileged:\s*["']?(?:true|yes|on)\b/i.test(rendered)) throw new HttpError(400, 'Compose refusé : privileged n’est jamais accordé.');
+  if (/(?:docker|containerd)\.sock\b/i.test(rendered)) throw new HttpError(400, 'Compose refusé : le socket Docker ne doit pas être monté. Utilise permissions.dockerSocket = proxy.');
+  if (/\b(?:pid|ipc|uts|cgroup|userns_mode):\s*["']?host\b/i.test(rendered)) throw new HttpError(400, 'Compose refusé : un service partage un espace de noms de l’hôte (pid/ipc/uts/cgroup/userns).');
+  if (/network_mode:\s*["']?host\b/i.test(rendered) && !p.hostNetwork) {
     throw new HttpError(400, 'Compose refusé : network_mode host n’est pas déclaré dans permissions.hostNetwork du manifeste.');
   }
-  const declarees = new Set((p.capAdd || []).map(c => c.toUpperCase()));
-  for (const bloc of rendered.match(/cap_add:[\s\S]*?(?=\n\s{0,4}[a-z_]+:|$)/g) || []) {
-    for (const cap of bloc.match(/-\s*([A-Z_]+)/g) || []) {
-      const nom = cap.replace(/-\s*/, '').toUpperCase();
+  const declarees = new Set((p.capAdd || []).map(c => String(c).toUpperCase().replace(/^CAP_/, '')));
+  for (const bloc of rendered.match(/cap_add:\s*(?:\[[^\]]*\]|(?:\r?\n\s*-\s*[^\r\n]+)+)/gi) || []) {
+    for (const cap of bloc.replace(/^cap_add:/i, '').match(/[A-Za-z_][A-Za-z0-9_]*/g) || []) {
+      const nom = cap.toUpperCase().replace(/^CAP_/, '');
       if (CAPS_INTERDITES.has(nom)) throw new HttpError(400, `Compose refusé : la capacité ${nom} n’est jamais accordée.`);
       if (!declarees.has(nom)) throw new HttpError(400, `Compose refusé : la capacité ${nom} n’est pas déclarée dans permissions.capAdd du manifeste.`);
     }
+  }
+  return true;
+}
+
+// Chemins hôte qu'un bind ne doit jamais atteindre (le socket et tout ce qui
+// donne la main sur l'hôte), même déclaré.
+const RACINES_HOTE_SENSIBLES = ['/', '/etc', '/proc', '/sys', '/dev', '/boot', '/root', '/home', '/run', '/var/run', '/var/lib/docker', '/var/lib/containerd', '/usr', '/bin', '/sbin', '/lib', '/lib64'];
+function sourceHoteSensible(src) {
+  const n = path.posix.normalize(String(src)).replace(/\/+$/, '') || '/';
+  if (/\.sock$/i.test(n)) return true;
+  return RACINES_HOTE_SENSIBLES.some(r => r === '/' ? n === '/' : (n === r || n.startsWith(r + '/')));
+}
+const estVrai = v => v === true || /^(?:true|yes|on|1)$/i.test(String(v));
+
+// Contrôle qui fait autorité : sur le modèle normalisé par Docker (voir
+// docker.configModele). Ce que Docker lit est ce que Docker exécute, donc
+// aucun artifice YAML (ancre, alias, casse, forme courte) ne passe à côté.
+// Par défaut, une extension n'obtient qu'un conteneur ordinaire : pas de
+// privilège, pas d'espace de noms de l'hôte, pas de périphérique, pas de
+// montage hôte ; les quelques exceptions passent par le manifeste (permissions).
+export function verifierModele(modele, m) {
+  const p = (m && m.permissions) || {};
+  const capsOk = new Set((p.capAdd || []).map(c => String(c).toUpperCase().replace(/^CAP_/, '')));
+  const refus = msg => { throw new HttpError(400, `Compose refusé : ${msg}`); };
+  for (const [nom, s] of Object.entries((modele && modele.services) || {})) {
+    if (!s || typeof s !== 'object') continue;
+    const ou = `le service « ${nom} »`;
+    if (estVrai(s.privileged)) refus(`${ou} demande privileged (jamais accordé).`);
+    if (s.build !== undefined) refus(`${ou} contient « build ». Une extension fournit son image publiée, ou la fait construire par le Hub.`);
+    for (const k of ['pid', 'ipc', 'uts', 'cgroup', 'userns_mode']) {
+      if (String(s[k] ?? '').toLowerCase() === 'host') refus(`${ou} partage l’espace ${k} de l’hôte.`);
+    }
+    if (String(s.network_mode ?? '').toLowerCase() === 'host' && !p.hostNetwork) refus(`${ou} utilise network_mode host, non déclaré dans permissions.hostNetwork.`);
+    for (const c of s.cap_add || []) {
+      const cap = String(c).toUpperCase().replace(/^CAP_/, '');
+      if (CAPS_INTERDITES.has(cap)) refus(`${ou} demande la capacité ${cap} (jamais accordée).`);
+      if (!capsOk.has(cap)) refus(`${ou} demande la capacité ${cap}, non déclarée dans permissions.capAdd.`);
+    }
+    for (const o of s.security_opt || []) {
+      const t = String(o).toLowerCase().replace(/\s+/g, '');
+      if (/unconfined|systempaths|label[:=](?:disable|type|user|role|level)/.test(t)) refus(`${ou} affaiblit l’isolement (security_opt « ${String(o).slice(0, 60)} »).`);
+    }
+    for (const d of s.devices || []) refus(`${ou} mappe un périphérique de l’hôte (« ${String(typeof d === 'string' ? d : d?.source || d?.path || '').slice(0, 60)} »).`);
+    if ((s.device_cgroup_rules || []).length) refus(`${ou} pose des règles device_cgroup.`);
+    for (const v of s.volumes || []) {
+      const type = v && typeof v === 'object' ? (v.type || 'volume') : 'bind';
+      if (type !== 'bind') continue; // volume nommé ou tmpfs : sans accès à l'hôte
+      const src = v && typeof v === 'object' ? v.source : String(v).split(':')[0];
+      if (!src || !String(src).startsWith('/')) refus(`${ou} a un montage de type « bind » sans source hôte claire.`);
+      if (sourceHoteSensible(src)) refus(`${ou} monte un chemin hôte sensible (« ${String(src).slice(0, 60)} »).`);
+      refus(`${ou} monte le chemin hôte « ${String(src).slice(0, 60)} ». Une extension n’utilise que des volumes nommés.`);
+    }
+  }
+  // Un volume nommé peut cacher un bind (driver local, « o: bind, device: /… »).
+  for (const [nom, v] of Object.entries((modele && modele.volumes) || {})) {
+    const o = (v && v.driver_opts) || {};
+    const dev = o.device ?? o.Device;
+    const opts = `${o.o ?? o.O ?? ''},${o.type ?? o.Type ?? ''}`.toLowerCase();
+    if (dev && /bind|none/.test(opts)) refus(`le volume « ${nom} » est un montage de l’hôte (« ${String(dev).slice(0, 60)} »).`);
   }
   return true;
 }
@@ -973,6 +1038,12 @@ export class Services {
     const file = this.stackFile(inst);
     fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
     fs.writeFileSync(file, rendered, { mode: 0o600 });
+    // Contrôle qui fait autorité, sur le Compose que Docker a lui-même
+    // normalisé (ancres, alias et formes courtes résolus) : avant tout
+    // téléchargement d'image et avant le démarrage, aucun privilège ni accès à
+    // l'hôte non déclaré ne passe. Échec fermé : on ne démarre pas ce qu'on
+    // n'a pas pu vérifier.
+    verifierModele(await docker.configModele(file), m);
     await docker.ensureNetwork(config.dockerNetwork);
     // Une image déjà présente sur la machine n'est pas retéléchargée : « docker
     // compose pull --policy missing » ne tient pas cette promesse, il tire quand
