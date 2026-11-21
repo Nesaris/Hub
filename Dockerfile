@@ -2,7 +2,7 @@
 # Hub — image de production. Node 24 (Argon2id natif), aucune dépendance npm.
 # L'image de base est épinglée par empreinte (index multi-architecture) : une
 # étiquette peut être déplacée, une empreinte non.
-ARG NODE_IMAGE=node:24.22.1-alpine@sha256:06d7adf3e0ef61a13f1d28682726366f97a15aa1888c934d3ecec86c33918b53
+ARG NODE_IMAGE=node:24.22.3-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
 
 # Renouvellement du certificat HTTPS local (conteneur hub-certificat) : openssl
 # seul, hors de l'image du Hub, qui n'en a pas besoin.
