@@ -1521,8 +1521,28 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     return avecIA.length === 1 ? { ia: { instance: avecIA[0].name } } : null;
   }
 
+  /**
+   * « Connecte Claude et Qwen à VIGIE » : plusieurs IA à la fois, seul MuxAI
+   * (anciennement Oracle) sait les réunir. Ailleurs, une seule : on demande laquelle.
+   */
+  plusieursIA(t) {
+    if (t.length > 300 || /\?\s*$/.test(t)) return null;
+    if (!/connect|branch|\breli|\blie\b|\blier\b|\bmets?\b|utilis|configur/i.test(t)) return null;
+    const IA = [['Claude', /\bclaude\b|anthropic/i], ['ChatGPT', /\bchat ?gpt\b|\bgpt-?[0-9o]|\bopenai\b|\bcodex\b/i], ['Qwen', /\bqwen/i], ['Kimi', /\bkimi\b|moonshot/i],
+      ['Mistral', /\bmistral/i], ['Llama', /\bllama/i], ['Gemma', /\bgemma/i], ['Gemini', /\bgemini\b/i], ['DeepSeek', /deepseek/i]];
+    const nommees = IA.filter(([, re]) => re.test(t)).map(([n]) => n);
+    if (nommees.length < 2) return null;
+    const cites = this.servicesCites(t);
+    if (cites.length !== 1) return null;
+    const inst = cites[0];
+    if (/muxai|oracle/i.test(`${inst.manifest?.id} ${inst.manifest?.name} ${inst.name}`)) return null;
+    return { reponse: `**${inst.name}** ne prend qu’une IA à la fois (seul **MuxAI** en réunit plusieurs). Laquelle je branche : ${nommees.map(n => `**${n}**`).join(' ou ')} ?\n\nEn changer plus tard ne lui fait rien oublier : sa mémoire et ses réglages restent les siens.` };
+  }
+
   demandeDirecte(text) {
     const t = String(text || '');
+    const plusieurs = this.plusieursIA(t);
+    if (plusieurs) return plusieurs;
     if (this.bots?.estBrancher(t)) return { bot: true };
     const ia = this.intentionIA(t);
     if (ia) return ia;

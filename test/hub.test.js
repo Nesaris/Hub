@@ -2180,6 +2180,11 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
   const recap4 = await waitFor(async () => tg.sent.slice(deja).find(m => /Je vais :/.test(m.text)), 8000);
   assert.equal(recap4.bot, '888888:BOTDOCKEURABCDEFGHIJKLMNOPQR', 'c’est le bot du service qui répond');
 
+  // Deux IA pour un service qui n'en prend qu'une : il demande laquelle, sans rien faire.
+  const deux = await api('POST', '/api/agent/ask', { text: `connecte Claude et Qwen à ${dc.name}` });
+  assert.equal(deux.status, 'answered');
+  assert.match(deux.reply, /ne prend qu’une IA à la fois \(seul \*\*MuxAI\*\* en réunit plusieurs\)\. Laquelle je branche : \*\*Claude\*\* ou \*\*Qwen\*\*/);
+
   // Débrancher : plus personne n'écoute ce bot.
   await api('PUT', '/api/bots-ia', { bots: [] });
   assert.equal(hub.bots.gere(JETON), false);
