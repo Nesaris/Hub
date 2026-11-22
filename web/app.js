@@ -147,6 +147,11 @@ async function boot() {
     history.replaceState(null, '', location.pathname + '#dash');
     if (!S.aiOpen) toggleAi();
     if (q) { S.aiPreRempli = q.slice(0, 2000); renderAi(); }
+  } else if (hash[0] === 'confirmer' && hash[1]) {
+    // Le lien d'un bot Telegram : un plan sensible, demandé de là-bas, se confirme ici avec la clé.
+    navigate('dash');
+    history.replaceState(null, '', location.pathname + '#dash');
+    confirmerPlan(decodeURIComponent(hash[1])).catch(fail);
   } else if (hash[0] === 'wf' && hash[1]) navigate('editor', hash[1]); else navigate(hash[0] || 'dash');
   // Le catalogue se relit à chaque chargement (le serveur en espace deux de
   // suite) : une version poussée sur GitHub se voit sans rien cliquer.
@@ -154,6 +159,27 @@ async function boot() {
     POST('/api/catalog/refresh', { auto: true }).then(annoncerMisesAJour).catch(() => {});
     proposerIa().catch(() => {});
   }
+}
+
+/* Un plan demandé depuis Telegram : ses étapes, puis la confirmation (le
+   renfort du socle s'ouvre de lui-même : clé d'accès). Le résultat repart
+   sur Telegram, là où la demande a été faite. */
+async function confirmerPlan(pid) {
+  if (session.role !== 'admin') return toast('Seul un administrateur confirme une action de l’assistant.', 'err');
+  const p = (await GET('/api/agent')).find(x => x.id === pid);
+  if (!p) return toast('Ce plan n’existe plus (ou il est trop ancien).', 'err');
+  if (p.status !== 'proposed') return toast(p.status === 'done' ? 'Ce plan a déjà été fait.' : 'Ce plan a déjà été traité.');
+  modal({
+    title: 'Confirmer la demande', sub: `Faite depuis Telegram : « ${String(p.request || '').slice(0, 160)} »`,
+    body: html`<ul class="plan-etapes">${(p.steps || []).map(s => html`<li>${s.label || s.tool}${s.problems?.length ? html`<div class="errbox">${s.problems.join(' ')}</div>` : ''}</li>`)}</ul>
+      <p class="muted">C’est sensible : ta clé d’accès est demandée pour confirmer. Le résultat partira aussi sur Telegram.</p>`,
+    actions: [
+      { label: 'Refuser', run: () => POST(`/api/agent/${encodeURIComponent(pid)}/reject`).then(() => toast('Refusé, rien n’a été fait.')).catch(fail) },
+      { label: 'Confirmer avec ma clé', cls: 'solid', run: async () => {
+        try { const r = await POST(`/api/agent/${encodeURIComponent(pid)}/execute`); toast(r.status === 'done' ? 'C’est fait.' : 'Pas tout à fait : voir l’assistant.', r.status === 'done' ? 'ok' : 'err'); } catch (e) { fail(e); }
+      } },
+    ],
+  });
 }
 
 /* Première fois, sans IA : l'assistant configure le Hub à ta place, encore
@@ -1811,10 +1837,37 @@ function carteAlertes(a) {
     </div>
   </div>`;
 }
+/* Les bots de l'assistant : chaque compte Telegram de Clés & API peut devenir
+   un bot qui écoute — un pour tout, un par service, ou plusieurs dans un même
+   groupe : c'est le bot du service visé qui répond. */
+function carteBots(b) {
+  const ligne = c => {
+    const x = b.bots.find(y => y.service === c.service) || { actif: false, lie: '', utilisateurs: [] };
+    return html`<div class="bot-ligne" data-bot=${c.service} data-id=${x.id || ''}>
+      <label class="check"><input type="checkbox" data-bot-actif checked=${!!x.actif} disabled=${!c.pret}> <b>${c.canal}</b>${x.nom ? html` <span class="mini mono">@${x.nom}</span>` : ''}</label>
+      <div class="row">
+        <select class="field sm" data-bot-lie aria-label="Service de ce bot"><option value="">Pour tout le Hub</option>${b.services.map(s => html`<option value=${s.id} selected=${s.id === x.lie}>Pour ${s.nom}</option>`)}</select>
+        <input class="field sm mono" data-bot-util placeholder="Groupe : identifiants autorisés" value=${(x.utilisateurs || []).join(', ')} autocomplete="off" spellcheck="false">
+      </div>
+      <div class="mini">${!c.pret ? `Pas prêt : ${c.manque}` : x.erreur ? `⚠ ${x.erreur}` : x.actif ? (x.lecture ? 'À l’écoute.' : 'En attente.') : 'Éteint.'}</div>
+    </div>`;
+  };
+  return html`<div class="card">
+    <div class="sec"><span class="itile key">${I('send')}</span><div class="grow"><h2>L’assistant sur Telegram</h2>
+      <p>Écris au bot ce que tu veux, en clair (« fais-moi un accès internet pour NexArc ») : l’assistant prépare, pose ses questions en boutons, et tu valides. Ce qui est sensible (Internet, suppression, comptes, sécurité) se confirme ici avec ta clé d’accès, par le lien du message. Aucune clé ne se tape dans Telegram.</p></div></div>
+    <div class="pad">
+      ${b.comptes.length ? b.comptes.map(ligne) : html`<p class="hint">Crée un bot avec @BotFather, puis ajoute-le comme compte Telegram dans <button type="button" class="link" data-nav="secrets">Clés & API</button>.</p>`}
+      ${b.comptesHub.length > 1 ? html`<div class="fl"><label for="botCompte">Il agit au nom de</label><select class="field" id="botCompte">${b.comptesHub.map(c => html`<option value=${c.id} selected=${c.id === b.compte}>${c.nom}</option>`)}</select></div>` : ''}
+      <div class="help">Discussion privée : seul toi. Groupe : seulement les identifiants listés (écris /id dans le groupe pour les connaître). Un bot déjà lu par un autre programme (les commandes de Relay, par exemple) ne peut pas être lu ici aussi.</div>
+      ${b.comptes.length ? html`<div class="row"><button class="btn solid sm" id="botSave">Enregistrer</button><span class="mini" id="botRes"></span></div>` : ''}
+    </div>
+  </div>`;
+}
 async function viewSettings(el, t) {
   const [ai, vars, expo, jt, dest, cp, mel, alr] = await Promise.all([GET('/api/ai'), GET('/api/variables'), GET('/api/exposition'), GET('/api/jetons').catch(() => ({ jetons: [] })),
     session.role === 'admin' ? GET('/api/destinations') : null, session.role === 'admin' ? GET('/api/coupure') : null, session.role === 'admin' ? GET('/api/courriel') : null,
     session.role === 'admin' ? GET('/api/alertes').catch(() => null) : null]);
+  const bia = session.role === 'admin' ? await GET('/api/bots-ia').catch(() => null) : null;
   if (!alive(t)) return;
   const roleLbl = { config: 'assistant', workflows: 'workflows', embeddings: 'embeddings' };
   const AUTONOMIES = [['conseil', 'Conseil', 'L’assistant propose, tu fais toi-même.'], ['validation', 'Validation (recommandé)', 'Chaque plan attend ton clic.'], ['autonome', 'Autonome', 'Il fait seul ce qui se défait : créer, corriger, activer, tester, t’écrire sur tes canaux. Supprimer, installer, régler un service, et tout workflow qui envoie des données ailleurs attendent ton accord.']];
@@ -1833,6 +1886,7 @@ async function viewSettings(el, t) {
     </div>
   </div>
   ${alr ? carteAlertes(alr) : ''}
+  ${bia ? carteBots(bia) : ''}
   ${mel ? html`<div class="card">
     <div class="sec"><span class="itile key">${I('mail')}</span><div class="grow"><h2>Courriel des comptes</h2>
       <p>L’adresse proposée à chaque compte créé depuis le Hub, et le relais qui envoie les liens d’invitation et de réinitialisation. Un service le reprend s’il n’a pas le sien et qu’il est servi en HTTPS (adresse publique), à son prochain redéploiement.</p></div></div>
@@ -1911,6 +1965,14 @@ async function viewSettings(el, t) {
       $('#alrRes', el).textContent = 'Message d’essai envoyé : regarde Telegram.';
     }).catch(fail);
   }
+  if (bia && $('#botSave', el)) $('#botSave', el).onclick = e => pulse(e.currentTarget, async () => {
+    const bots = $$('[data-bot]', el).filter(l => $('[data-bot-actif]', l).checked || l.dataset.id).map(l => ({
+      ...(l.dataset.id ? { id: l.dataset.id } : {}), service: l.dataset.bot, lie: $('[data-bot-lie]', l).value, actif: $('[data-bot-actif]', l).checked,
+      utilisateurs: $('[data-bot-util]', l).value.split(/[\s,;]+/).filter(Boolean) }));
+    const r = await PUT('/api/bots-ia', { bots, ...($('#botCompte', el) ? { compte: $('#botCompte', el).value } : {}) });
+    const n = r.bots.filter(x => x.actif).length;
+    $('#botRes', el).textContent = n ? `Enregistré : ${n} bot${n > 1 ? 's' : ''} à l’écoute.` : 'Enregistré : aucun bot n’écoute.';
+  }).catch(fail);
   if (mel) $('#melSave', el).onclick = e => pulse(e.currentTarget, async () => {
     const pass = $('#melPass', el).value;
     const r = await PUT('/api/courriel', { defaut: $('#melDefaut', el).value.trim(), relais: {

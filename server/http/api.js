@@ -275,6 +275,9 @@ export function registerRoutes(routeur, h) {
   r.get('/api/alertes', () => h.alertes.vue(), { role: 'admin' });
   r.put('/api/alertes', ctx => h.alertes.poser(ctx.body, ctx.user), { role: 'admin', renfort: true });
   r.post('/api/alertes/essai', ctx => h.alertes.essai(ctx.user), { role: 'admin' });
+  // Les bots Telegram de l'assistant : qui lit quoi, et pour quel service.
+  r.get('/api/bots-ia', () => h.bots.vue(), { role: 'admin' });
+  r.put('/api/bots-ia', ctx => h.bots.poser(ctx.body, ctx.user), { role: 'admin', renfort: true });
   r.get('/api/courriel', () => vueCourriel(db, h.vault), { role: 'admin' });
   r.put('/api/courriel', ctx => poserCourriel(db, h.vault, audit, ctx.body, ctx.user), { role: 'admin', renfort: true });
   r.get('/api/theme', vueTheme);
@@ -528,7 +531,11 @@ export function registerRoutes(routeur, h) {
     // Un plan qui passe par une route sous renfort le demande ici, au clic : l'humain confirme, l'assistant exécute.
     const renfort = agent.exigeRenfort(ctx.params.id, ctx.body.only);
     if (renfort) h.socle.portail.exiger(ctx.socle, { role: 'admin', renfort: true });
-    return agent.execute(ctx.params.id, ctx.user, { only: ctx.body.only, renfort });
+    return agent.execute(ctx.params.id, ctx.user, { only: ctx.body.only, renfort }).then(out => {
+      // Demandé depuis Telegram, confirmé ici : le résultat repart là-bas.
+      h.bots?.apresExecution(ctx.params.id, out).catch(() => {});
+      return out;
+    });
   }, { role: 'admin' });
   r.post('/api/agent/:id/reject', ctx => agent.reject(ctx.params.id, ctx.user, qui(ctx)), { jeton: 'assistant' });
 

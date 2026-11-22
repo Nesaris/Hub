@@ -1,5 +1,14 @@
 [
   {
+    "version": "0.18.0",
+    "date": "2026-11-22",
+    "points": [
+      "L’assistant sur Telegram : écris à ton bot ce que tu veux, en clair (« fais-moi un accès internet pour NexArc »). Il prépare, pose ses questions en boutons (domaine, préfixe, paramètres), et tu valides d’un clic. Un bot pour tout, un par service, ou plusieurs dans un même groupe : c’est le bot du service visé qui répond.",
+      "Ce qui est sensible (Internet, suppression, comptes, sécurité) se confirme dans le Hub avec ta clé d’accès, par le lien du message ; le résultat revient sur Telegram. Aucune clé ne se tape dans Telegram.",
+      "« Connecte le bot Telegram qui correspond à Relay » : l’assistant trouve le bot par son nom, et demande lequel s’il hésite. Réglages → L’assistant sur Telegram."
+    ]
+  },
+  {
     "version": "0.17.2",
     "date": "2026-11-21",
     "points": [

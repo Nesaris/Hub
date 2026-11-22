@@ -938,3 +938,10 @@ details.avance .help{margin:8px 0}
 /* Position du menu, page Thème : le schéma réduit dans les puces par service. */
 .theme-puce svg{width:22px;height:16px;flex:none}
 .theme-ligne .theme-choix+.theme-choix{margin-top:6px}
+
+/* L'assistant sur Telegram : un bot par ligne, son service, ses utilisateurs. */
+.bot-ligne { display: grid; gap: 6px; padding: 10px 0; border-bottom: 1px solid var(--hair-soft); }
+.bot-ligne:last-of-type { border-bottom: 0; }
+.bot-ligne .row { display: flex; gap: 8px; flex-wrap: wrap; }
+.bot-ligne .row .field { flex: 1 1 200px; min-width: 0; }
+.plan-etapes { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; }

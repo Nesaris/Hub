@@ -1882,6 +1882,8 @@ test('autorisation : chaque route balayée sans session, en lecture seule et en 
     'GET /api/alertes',
     'PUT /api/alertes',
     'POST /api/alertes/essai',
+    'GET /api/bots-ia',
+    'PUT /api/bots-ia',
     'PUT /api/connexions/cloudflare',
     'DELETE /api/connexions/cloudflare',
     'POST /api/connexions/routes',
@@ -2022,4 +2024,163 @@ test('interface sous /v/<version>/ : une mise à jour change l’adresse de chaq
   assert.equal(ancien.status, 200, 'une page gardée en cache reçoit le fichier courant');
   assert.equal(ancien.headers.get('cache-control'), 'no-cache');
   assert.equal((await fetch(`${base}/v/${version}/../../package.json`)).status, 404);
+});
+
+test('l’assistant sur Telegram : demande en clair, questions en boutons, validation d’un clic, sensible confirmé par la clé dans le Hub', async () => {
+  const renforcer = async () => {
+    const o = await admin.post('/api/compte/renfort/options');
+    await admin.post('/api/compte/renfort', { methode: 'cle', reponse: cleAdmin.signer(o.json, admin.origine) });
+  };
+  const JETON = '777777:BOTSASSISTANTABCDEFGHIJKLMNO', CHAT = 5150;
+  await api('POST', '/api/secrets', { service: 'telegram', compte: 'Assistant', champs: { BOT_TOKEN: JETON, CHAT_ID: String(CHAT) } });
+  await api('PUT', '/api/ai-autonomy', { value: 'validation' });
+  fake.state.tg = { updates: [], sent: [], id: 3000, appels: [] };
+  const tg = fake.state.tg;
+  const compte = (await api('GET', '/api/bots-ia')).comptes.find(c => c.canal === 'Telegram (Assistant)');
+  assert.ok(compte?.pret, 'le compte de Clés & API est proposé comme bot');
+  // Brancher les bots se confirme avec la clé ; un compte inconnu est refusé.
+  assert.equal(hub.router.routes.find(r => r.methode === 'PUT' && r.re.test('/api/bots-ia')).options.renfort, true);
+  await renforcer();
+  await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: 'pas-un-compte' }] }), /n’est pas un compte Telegram/);
+  await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: compte.service, utilisateurs: ['@ana'] }] }), /identifiants Telegram/);
+  const v = await api('PUT', '/api/bots-ia', { bots: [{ service: compte.service }] });
+  assert.equal(v.bots.length, 1);
+  await waitFor(async () => tg.appels.some(a => a.methode === 'getMe' && a.bot === JETON), 5000);
+  await new Promise(r => setTimeout(r, 400));
+  const ecrire = (text, { de = CHAT, chat = CHAT } = {}) => { const id = ++tg.id; tg.updates.push({ update_id: id, bot: JETON, message: { message_id: id, chat: { id: chat }, from: { id: de }, text } }); };
+  const presser = (bouton, { de = CHAT } = {}) => { const id = ++tg.id; tg.updates.push({ update_id: id, bot: JETON, callback_query: { id: 'cq' + id, data: bouton.callback_data, from: { id: de }, message: { message_id: 1, chat: { id: CHAT } } } }); };
+  const dernier = async (motif, apres = 0) => waitFor(async () => tg.sent.slice(apres).filter(m => m.bot === JETON).findLast(m => motif.test(m.text)), 8000);
+  const boutons = m => (m.reply_markup?.inline_keyboard || []).flat();
+
+  // /id : de quoi remplir les utilisateurs d'un groupe.
+  ecrire('/id', { chat: -100777, de: 61 });
+  assert.match((await dernier(/Discussion : -100777/)).text, /Toi : 61/);
+  // Un inconnu n'est pas écouté : ni dans la discussion du bot, ni ailleurs.
+  const n0 = tg.sent.length;
+  ecrire('supprime tout', { de: 999 });
+  ecrire('supprime tout', { chat: -100777, de: 61 });
+  await new Promise(r => setTimeout(r, 1200));
+  assert.equal(tg.sent.length, n0, 'rien ne répond à qui n’est pas autorisé');
+
+  // Une action qui se défait : récapitulatif, ✅ Valider, c'est fait.
+  const fuseauAvant = (await api('GET', '/api/fuseau')).fuseau;
+  fake.state.planQueue = [{ reply: 'Je règle le fuseau.', steps: [{ tool: 'hub', args: { action: 'PUT /api/fuseau', corps: { fuseau: 'Pacific/Auckland' } } }] }];
+  let deja = tg.sent.length;
+  ecrire('mets le fuseau sur Auckland');
+  const recap = await dernier(/Je vais :/, deja);
+  assert.match(recap.text, /Fuseau horaire/);
+  const valider = boutons(recap).find(b => /Valider/.test(b.text));
+  assert.ok(valider && /^ia:/.test(valider.callback_data), JSON.stringify(recap.reply_markup));
+  presser(valider, { de: 999 });
+  await waitFor(async () => tg.appels.some(a => a.methode === 'answerCallbackQuery' && /pas pour toi/.test(a.text)), 5000);
+  assert.notEqual((await api('GET', '/api/fuseau')).fuseau, 'Pacific/Auckland', 'le bouton d’un autre ne fait rien');
+  deja = tg.sent.length;
+  presser(valider);
+  assert.match((await dernier(/C’est fait/, deja)).text, /✅/);
+  assert.equal((await api('GET', '/api/fuseau')).fuseau, 'Pacific/Auckland');
+  presser(valider);
+  await waitFor(async () => tg.appels.some(a => a.methode === 'answerCallbackQuery' && /expiré/.test(a.text)), 5000);
+  assert.ok((await api('GET', '/api/audit')).some(l => l.action === 'ia.hub' && /Telegram, Telegram \(Assistant\)/.test(l.actor)), 'au journal : qui, et par quel bot');
+  await api('PUT', '/api/fuseau', { fuseau: fuseauAvant || 'UTC' });
+
+  // Un paramètre manquant : demandé en clair, réponse par message.
+  const dc = (await api('GET', '/api/instances')).find(i => i.extId === 'docker-control' || i.manifest?.id === 'docker-control');
+  fake.state.planQueue = [{ reply: 'Je relance un conteneur.', steps: [{ tool: 'run_action', args: { instance: dc.name, action: 'container.restart', params: {} } }] }];
+  deja = tg.sent.length;
+  ecrire('relance un conteneur');
+  const question = await dernier(/Il me manque|réponds par un message/, deja);
+  assert.match(question.text, /réponds par un message/);
+  deja = tg.sent.length;
+  ecrire('web-1');
+  const recap2 = await dernier(/Je vais :/, deja);
+  const pid2 = hub.db.all("SELECT id, plan FROM agent_plans WHERE status = 'proposed' ORDER BY created DESC").find(r => JSON.parse(r.plan).steps[0]?.tool === 'run_action').id;
+  assert.equal(JSON.parse(hub.db.get('SELECT plan FROM agent_plans WHERE id = ?', pid2).plan).steps[0].args.params.container, 'web-1', 'la réponse remplit le paramètre');
+  assert.equal(JSON.parse(hub.db.get('SELECT plan FROM agent_plans WHERE id = ?', pid2).plan).origine.chat, String(CHAT));
+  deja = tg.sent.length;
+  presser(boutons(recap2).find(b => /Annuler/.test(b.text)));
+  await dernier(/Annulé/, deja);
+  assert.equal(hub.db.get('SELECT status FROM agent_plans WHERE id = ?', pid2).status, 'rejected');
+
+  // « Fais-moi un accès internet pour <service> » : domaine en boutons, préfixe proposé, confirmation par la clé dans le Hub.
+  const publies = [];
+  const connexionsAvant = { etat: hub.bots.connexions.etat, publier: hub.connexions.publier };
+  hub.bots.connexions.etat = async () => ({ relay: { nom: 'relay' }, cloudflare: true, domaines: ['exemple.fr', 'autre.fr'], zonesCloudflare: [],
+    services: [{ id: dc.id, nom: dc.name, cible: 'dc:80' }] });
+  hub.connexions.publier = async (sid, corps, acteur) => { publies.push({ sid, ...corps, acteur }); return { url: `https://${corps.hote}` }; };
+  try {
+    deja = tg.sent.length;
+    ecrire(`fais-moi un accès internet pour ${dc.name}`);
+    const qDomaine = await dernier(/Sur quel domaine/, deja);
+    assert.match(qDomaine.text, new RegExp(`Une adresse pour ${dc.name} \\(Internet, par le tunnel Cloudflare\\)`));
+    deja = tg.sent.length;
+    presser(boutons(qDomaine).find(b => b.text === 'autre.fr'));
+    const qPrefixe = await dernier(/Quel préfixe/, deja);
+    assert.ok(boutons(qPrefixe).some(b => /Garder/.test(b.text)), 'le préfixe par défaut est proposé');
+    deja = tg.sent.length;
+    ecrire('Pas Valide!');
+    await dernier(/ne convient pas/, deja);
+    deja = tg.sent.length;
+    ecrire('console');
+    const recap3 = await dernier(/Je vais :/, deja);
+    assert.match(recap3.text, /https:\/\/console\.autre\.fr/);
+    assert.match(recap3.text, /confirme dans le Hub avec ta clé/);
+    const lien = boutons(recap3).find(b => b.url);
+    assert.ok(lien && !boutons(recap3).some(b => /Valider/.test(b.text)), 'pas de validation depuis Telegram pour un geste sensible');
+    const pid3 = /#confirmer\/([\w-]+)$/.exec(lien.url)[1];
+    assert.equal(publies.length, 0, 'rien n’est publié avant la confirmation');
+    // Dans le Hub : la clé d'accès, puis le résultat repart sur Telegram.
+    deja = tg.sent.length;
+    const brut = await admin.post(`/api/agent/${pid3}/execute`, {});
+    const fait = brut.status === 403 ? (await renforcer(), await api('POST', `/api/agent/${pid3}/execute`)) : brut.json;
+    assert.equal(fait.status, 'done', JSON.stringify(fait.results));
+    assert.deepEqual(publies.map(p => [p.sid, p.hote, p.mode]), [[dc.id, 'console.autre.fr', 'cloudflare']]);
+    assert.match((await dernier(/C’est fait/, deja)).text, /console\.autre\.fr/);
+  } finally {
+    hub.bots.connexions.etat = connexionsAvant.etat;
+    hub.connexions.publier = connexionsAvant.publier;
+  }
+
+  // Aucune clé ne se tape dans Telegram ; la coupure d'urgence vaut aussi ici.
+  await waitFor(async () => !hub.agent.courant, 5000);
+  await new Promise(r => setTimeout(r, 1000));
+  fake.state.planQueue = [{ reply: 'Il faut ta clé.', steps: [{ tool: 'hub', args: { action: 'PUT /api/fuseau', corps: { fuseau: 'UTC' }, demander: [{ key: 'cle', label: 'Ta clé d’API', type: 'secret' }] } }] }];
+  deja = tg.sent.length;
+  ecrire('branche ma clé');
+  const qCle = await dernier(/ne se tape jamais ici/, deja);
+  assert.ok(boutons(qCle).some(b => /#secrets$/.test(b.url || '')));
+  ecrire('/annuler');
+  await dernier(/Abandonné/, deja);
+  await api('PUT', '/api/coupure', { ia: true }).catch(async e => { if (e.status === 403) { await renforcer(); return api('PUT', '/api/coupure', { ia: true }); } throw e; });
+  deja = tg.sent.length;
+  ecrire('mets le fuseau sur Tokyo');
+  assert.ok(await dernier(/⛔/, deja));
+  await api('PUT', '/api/coupure', { ia: false });
+
+  // Depuis le Hub : « connecte le bot qui correspond à <service> » — le bot par son nom, ou une question.
+  await api('POST', '/api/secrets', { service: 'telegram', compte: 'Dockeur', champs: { BOT_TOKEN: '888888:BOTDOCKEURABCDEFGHIJKLMNOPQR', CHAT_ID: String(CHAT) } });
+  const b1 = await api('POST', '/api/agent/ask', { text: `connecte le bot Telegram qui correspond à ${dc.name}` });
+  assert.equal(b1.model, 'Hub', 'sans le modèle');
+  assert.match(b1.reply, /Je branche le bot \*\*Dockeur\*\* sur \*\*/);
+  assert.match(b1.steps[0].label, /Brancher le bot Telegram « Dockeur »/);
+  assert.match(b1.steps[0].label, /confirmeras ton identité/);
+  const fait1 = await executer(b1);
+  assert.equal(fait1.status, 'done', JSON.stringify(fait1.results));
+  const vb = await api('GET', '/api/bots-ia');
+  assert.equal(vb.bots.find(b => b.canal === 'Telegram (Dockeur)')?.lie, dc.id);
+  assert.ok(vb.bots.some(b => b.canal === 'Telegram (Assistant)' && b.actif), 'les autres bots restent');
+  const b2 = await api('POST', '/api/agent/ask', { text: 'branche un bot sur synapse' });
+  assert.equal(b2.status, 'answered');
+  assert.match(b2.reply, /Je ne sais pas quel bot prendre pour \*\*.*\*\*.*Lequel/s);
+  const b3 = await api('POST', '/api/agent/ask', { text: 'connecte le bot Telegram' });
+  assert.match(b3.reply, /Pour quel service/);
+  // Le bot d'un service répond pour lui dans la discussion : une demande qui vise ce service part par son bot.
+  fake.state.planQueue = [{ reply: 'Je relance un conteneur.', steps: [{ tool: 'run_action', args: { instance: dc.name, action: 'container.restart', params: { container: 'web-1' } } }] }];
+  deja = tg.sent.length;
+  ecrire('relance web-1');
+  const recap4 = await waitFor(async () => tg.sent.slice(deja).find(m => /Je vais :/.test(m.text)), 8000);
+  assert.equal(recap4.bot, '888888:BOTDOCKEURABCDEFGHIJKLMNOPQR', 'c’est le bot du service qui répond');
+
+  // Débrancher : plus personne n'écoute ce bot.
+  await api('PUT', '/api/bots-ia', { bots: [] });
+  assert.equal(hub.bots.gere(JETON), false);
 });

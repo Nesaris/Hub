@@ -221,6 +221,8 @@ export class Alertes {
     this.etat.ecoute = false;
     const t = this.telegram();
     if (!t || !this.reglage().types.maj) return;
+    // Ce bot est lu par l'assistant (bots.js) : c'est lui qui nous passe les boutons.
+    if (this.bots?.gere(t.token)) { this.etat.ecoute = true; return; }
     const fin = new AbortController();
     this.ecoute = fin;
     this.etat.ecoute = true;

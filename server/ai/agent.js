@@ -894,6 +894,8 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     if (direct?.ia) Object.assign(direct, await this.reponseIA(direct.ia.instance, direct.ia.texte || text));
     if (direct?.majs) Object.assign(direct, await this.reponseMajs());
     if (direct?.exposer) Object.assign(direct, await this.reponseExposer(text));
+    // « Connecte le bot Telegram qui correspond à Relay » : le bot par son nom, sans le modèle.
+    if (direct?.bot) Object.assign(direct, this.bots.reponseBrancher(text));
     /* « État des services », « salut ça va » : le Hub répond seul, tout de
        suite, avec les vrais chiffres. Le modèle — et ses 30 s — reste pour
        ce qui demande de réfléchir. */
@@ -1521,6 +1523,7 @@ ${JSON.stringify(this.donneesConversation(ctx))}
 
   demandeDirecte(text) {
     const t = String(text || '');
+    if (this.bots?.estBrancher(t)) return { bot: true };
     const ia = this.intentionIA(t);
     if (ia) return ia;
     // « Expose tout en ligne », « mets le hub sur Internet » : le tunnel, sans le modèle.

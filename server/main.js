@@ -31,6 +31,7 @@ import { Memoire } from './ai/memoire.js';
 import { CerveauHub } from './ai/cerveau.js';
 import { JournalHub } from './ai/journal.js';
 import { Agent } from './ai/agent.js';
+import { BotsIA } from './ai/bots.js';
 import { Router, createServer } from './http/server.js';
 import { lireTls } from './http/tls.js';
 import { Connexions } from './connexions.js';
@@ -156,7 +157,7 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   agent.voix = voix;   // « connecte VOX à ElevenLabs » : l'assistant le fait lui-même
   // Les alertes du Hub sur Telegram ; un bouton reçu pendant une écoute de l'assistant leur revient.
   const alertes = new Alertes({ db, bus, audit, services, ai, agent });
-  agent.surRappel = cq => alertes.rappel(cq);
+  agent.surRappel = cq => (String(cq?.data || '').startsWith('ia:') ? hub.bots.rappel(cq) : alertes.rappel(cq));
   const hub = { db, bus, vault, audit, socle, jetons, registry, adaptation, destinations, services, runtime, store, capabilities, ai, engine, triggers, probes, mesures, agent, accounts, connexions, secrets, memoire, logos, voix, cerveau, journal, alertes, liens };
   const router = new Router();
   registerRoutes(router, hub);
@@ -166,6 +167,12 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   accesHub.apresEcriture = () => liens.planifier();
   agent.accesHub = accesHub;
   hub.accesHub = accesHub;
+  // Parler à l'assistant depuis Telegram : un bot par service, un pour tout, ou un groupe.
+  const bots = new BotsIA({ db, audit, agent, services, connexions, alertes });
+  alertes.bots = bots;
+  hub.bots = bots;
+  agent.bots = bots;
+  bus.on('agent.ecoute', e => { if (e && e.fin !== true) bots.ceder(); });
   hub.server = createServer({ router, socle, jetons, quotas, webDir: path.join(ROOT, 'web'), socleWebDir: path.join(ROOT, 'socle', 'web'), gamme: () => gammePour(reglageTheme(db), CLE_HUB), disposition: () => dispositionPour(reglageDisposition(db), CLE_HUB), tls, apresEcriture: () => liens.planifier(), version: config.version });
 
   const timers = [];
@@ -197,6 +204,7 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
     // Pannes, retours, mises à jour et workflows en échec : racontés à SYNAPSE.
     timers.push(journal.demarrer());
     alertes.demarrer();
+    bots.demarrer();
     const signaler = domaine => e => log.warn(domaine, e.message);
     setTimeout(() => cerveau.publier().catch(signaler('cerveau')), 20000).unref();
     setTimeout(() => voix.synchroniserLien().catch(e => log.warn('voix', e.message)), 25000).unref();
@@ -211,7 +219,7 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   hub.iaServices = iaServices;
   hub.stop = async () => {
     iaServices.fermer();
-    timers.forEach(clearInterval); socle.arreter(); agent.arreterEcoute(); alertes.arreter(); await triggers.stopAll(); probes.stop(); hub.server.close();
+    timers.forEach(clearInterval); socle.arreter(); agent.arreterEcoute(); alertes.arreter(); bots.arreter(); await triggers.stopAll(); probes.stop(); hub.server.close();
     await Promise.race([Promise.allSettled([...engine.running.values()]), new Promise(r => setTimeout(r, 3000))]);
     db.close();
   };

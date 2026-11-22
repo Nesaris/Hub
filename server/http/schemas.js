@@ -91,6 +91,7 @@ export const SCHEMAS = {
   'PUT /api/fuseau': { corps: { fuseau: REQ(TXT(64)) } },
   'PUT /api/alertes': { corps: { canal: TXT(120), types: { type: 'objet', champs: { maj: OUI, workflow: OUI, ia: OUI, service: OUI } } } },
   'POST /api/alertes/essai': { corps: VIDE },
+  'PUT /api/bots-ia': { corps: { compte: TXT(128), bots: LISTE({ type: 'objet', champs: { id: TXT(24), service: REQ(TXT(120)), lie: TXT(128), utilisateurs: LISTE(TXT(15), 20), actif: OUI } }, 30) } },
   'PUT /api/connexions/cloudflare': { corps: { jeton: REQ(TXT(200, { motif: /^[A-Za-z0-9_-]{20,200}$/ })) } },
   'DELETE /api/connexions/cloudflare': { corps: VIDE },
   'PUT /api/connexions/tunnel': { corps: { tunnel: TXT(36, { motif: /^[0-9a-f-]{36}$/ }), nom: TXT(60, { motif: /^[A-Za-z0-9][\w.-]{0,59}$/ }) } },

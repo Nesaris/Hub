@@ -75,10 +75,18 @@ export function startFake() {
     if (p.startsWith('/tg/bot')) {
       // Un faux Telegram : les envois sont gardés, et une réponse « de l'utilisateur » peut suivre.
       const tg = state.tg ||= { updates: [], sent: [], id: 100 };
+      const jeton = p.slice(7, p.indexOf('/', 7));
+      // Les autres méthodes de l'API Bot : gardées telles quelles, toujours acceptées.
+      const autre = /\/(getMe|sendChatAction|answerCallbackQuery|editMessageReplyMarkup)$/.exec(p);
+      if (autre) {
+        (tg.appels ||= []).push({ methode: autre[1], bot: jeton, ...body });
+        return send(200, { ok: true, result: autre[1] === 'getMe' ? { id: 1, is_bot: true, username: `bot_${jeton.slice(0, 6)}` } : true });
+      }
       if (p.endsWith('/sendMessage')) {
         // `coupures` : autant de connexions coupées net avant de répondre (« fetch failed »).
         if (tg.coupures > 0) { tg.coupures--; return req.socket.destroy(); }
         body.message_id = ++tg.mid || (tg.mid = 1000);
+        Object.defineProperty(body, 'bot', { value: jeton, enumerable: false });
         tg.sent.push(body);
         // Un « 💭 / ⚙️ » d'attente n'appelle pas de réponse de l'utilisateur.
         if (/^(💭|⚙️)/.test(body.text)) return send(200, { ok: true, result: { message_id: body.message_id } });
@@ -101,10 +109,12 @@ export function startFake() {
         // `coupuresEcoute` : autant d'attentes coupées net (réseau qui lâche pendant l'écoute).
         if (tg.coupuresEcoute > 0 && url.searchParams.get('offset') !== '-1') { tg.coupuresEcoute--; return req.socket.destroy(); }
         const off = Number(url.searchParams.get('offset') || 0);
-        const liste = off < 0 ? tg.updates.slice(off) : tg.updates.filter(u => u.update_id >= off);
+        // Une mise à jour peut viser un seul bot (`bot`) : les autres ne la voient pas.
+        const pourMoi = u => !u.bot || u.bot === jeton;
+        const liste = (off < 0 ? tg.updates.slice(off) : tg.updates.filter(u => u.update_id >= off)).filter(pourMoi);
         if (liste.length || off < 0) return send(200, { ok: true, result: liste });
         const t0 = Date.now();
-        const attendre = () => { const l = tg.updates.filter(u => u.update_id >= off); if (l.length || Date.now() - t0 > 1500) return send(200, { ok: true, result: l }); setTimeout(attendre, 100); };
+        const attendre = () => { const l = tg.updates.filter(u => u.update_id >= off && pourMoi(u)); if (l.length || Date.now() - t0 > 1500) return send(200, { ok: true, result: l }); setTimeout(attendre, 100); };
         return attendre();
       }
     }

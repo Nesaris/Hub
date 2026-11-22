@@ -67,6 +67,7 @@ export const LIBELLES = {
   'POST /api/connexions/appliquer': 'Réappliquer la configuration de Relay',
   'PUT /api/alertes': 'Alertes du Hub sur Telegram {canal, types}',
   'POST /api/alertes/essai': 'Envoyer une alerte d’essai',
+  'PUT /api/bots-ia': 'Bots Telegram de l’assistant {compte, bots:[{service, lie, utilisateurs, actif}]}',
   'PUT /api/courriel': 'Courriel des comptes {defaut, relais: {hote, port, securite, de}}',
   'PUT /api/theme': 'Thème de l’interface',
   'POST /api/instances/:id/options': 'Lister les valeurs possibles d’un champ',
