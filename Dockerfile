@@ -38,6 +38,22 @@ VOLUME ["/home/outil"]
 EXPOSE 7110
 CMD ["node", "/opt/pont.mjs"]
 
+# Plugin compose construit ici : celui d'Alpine (et la dernière version publiée)
+# embarque klauspost/compress 1.20.0 (GO-2026-6865, haute) et otel 1.46.0.
+# Même source, épinglée par son commit, dépendances corrigées, Go à jour.
+ARG GO_IMAGE=golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab
+FROM ${GO_IMAGE} AS compose
+ARG COMPOSE_VERSION=v5.8.0
+ARG COMPOSE_COMMIT=4bbc81a2b578ee0cf287b95bd3453725389a75a3
+ENV CGO_ENABLED=0 GOFLAGS=-mod=mod
+RUN apk add --no-cache git \
+ && git clone --quiet --filter=blob:none https://github.com/docker/compose.git /src \
+ && cd /src && git checkout --quiet "$COMPOSE_COMMIT" \
+ && go get github.com/klauspost/compress@v1.20.2 go.opentelemetry.io/otel@v1.47.0 go.opentelemetry.io/otel/sdk@v1.47.0 go.opentelemetry.io/otel/trace@v1.47.0 \
+ && go mod tidy \
+ && go build -trimpath -ldflags "-s -w -X github.com/docker/compose/v5/internal.Version=${COMPOSE_VERSION}" -o /out/docker-compose ./cmd \
+ && /out/docker-compose version
+
 FROM ${NODE_IMAGE} AS hub
 # Paquets du système à jour, et pas de npm, npx, corepack ni yarn : le service
 # n'a aucune dépendance npm, ils n'ont rien à faire dans l'image.
@@ -46,7 +62,9 @@ RUN apk upgrade --no-cache && rm -rf /usr/local/lib/node_modules/npm /usr/local/
 # CLI docker + plugin compose : le Hub pilote Docker par le proxy de socket
 # (DOCKER_HOST), jamais par le socket lui-même. Même utilisateur qu'avant
 # (1001) : le volume de données existant reste lisible.
-RUN apk add --no-cache docker-cli docker-cli-compose tini \
+COPY --from=compose /out/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+RUN apk add --no-cache docker-cli tini \
+ && docker compose version \
  && addgroup -S -g 1001 hub && adduser -S -G hub -u 1001 hub \
  && mkdir -p /data /run/mesure && chown hub:hub /data /run/mesure && chmod 700 /data
 
