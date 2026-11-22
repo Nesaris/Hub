@@ -3,6 +3,8 @@
 # L'image de base est épinglée par empreinte (index multi-architecture) : une
 # étiquette peut être déplacée, une empreinte non.
 ARG NODE_IMAGE=node:24.22.3-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+# Go, pour construire le plugin compose (étape « compose » plus bas).
+ARG GO_IMAGE=golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab
 
 # Renouvellement du certificat HTTPS local (conteneur hub-certificat) : openssl
 # seul, hors de l'image du Hub, qui n'en a pas besoin.
@@ -41,7 +43,6 @@ CMD ["node", "/opt/pont.mjs"]
 # Plugin compose construit ici : celui d'Alpine (et la dernière version publiée)
 # embarque klauspost/compress 1.20.0 (GO-2026-6865, haute) et otel 1.46.0.
 # Même source, épinglée par son commit, dépendances corrigées, Go à jour.
-ARG GO_IMAGE=golang:1.26.11-alpine@sha256:ecb67f987aa1a57794c91d19ade7ae0209f2f0f5496aaef9e6ae85ddf92d02ab
 FROM ${GO_IMAGE} AS compose
 ARG COMPOSE_VERSION=v5.8.0
 ARG COMPOSE_COMMIT=4bbc81a2b578ee0cf287b95bd3453725389a75a3
