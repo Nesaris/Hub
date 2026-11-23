@@ -989,10 +989,12 @@ ${JSON.stringify(this.donneesConversation(ctx))}
              suite — un petit modèle s'égarait dans 6 000 caractères de JSON. */
           const liste = Array.isArray(brut) ? brut : brut && typeof brut === 'object' ? (['items', 'devices', 'appareils', 'data', 'results', 'list', 'alerts', 'alertes'].map(k => brut[k]).find(Array.isArray) || Object.values(brut).find(v => Array.isArray(v) && v.length && typeof v[0] === 'object')) : null;
           if (/^\s*(liste|list|montre|affiche|donne)\b/i.test(text) && Array.isArray(liste)) {
-            const champ = (o, ks) => { for (const k of ks) { const v = o?.[k]; if (v !== undefined && v !== null && v !== '' && typeof v !== 'object') return String(v); } return null; };
+            // Un identifiant technique (uuid, cuid) n'est pas un nom : on prend ce qui se lit.
+            const technique = v => /^[0-9a-f]{8}-[0-9a-f]{4}-|^c[a-z0-9]{20,}$|^[0-9a-f]{24,}$/i.test(v);
+            const champ = (o, ks) => { for (const k of ks) { const v = o?.[k]; if (v !== undefined && v !== null && v !== '' && typeof v !== 'object' && !technique(String(v))) return String(v).slice(0, 120); } return null; };
             const lignes = liste.slice(0, 40).map(o => {
               if (!o || typeof o !== 'object') return `- ${String(o).slice(0, 80)}`;
-              const nom = champ(o, ['name', 'nom', 'hostname', 'label', 'title', 'titre', 'host', 'id']) || '?';
+              const nom = champ(o, ['name', 'nom', 'hostname', 'label', 'title', 'titre', 'message', 'summary', 'resume', 'description', 'type', 'host', 'ip', 'mac']) || '?';
               const plus = [champ(o, ['ip', 'address', 'adresse', 'ipv4']), champ(o, ['vendor', 'fabricant', 'type', 'kind', 'category']), champ(o, ['status', 'etat', 'state', 'severity', 'level', 'niveau'])].filter(x => x && x !== nom);
               return `- **${nom}**${plus.length ? ` — ${plus.join(' · ')}` : ''}`;
             });
