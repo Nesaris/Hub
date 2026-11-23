@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.22.0",
+    "date": "2026-11-23",
+    "points": [
+      "Les services affichent leur vrai logo (Mes services, catalogue, vue d’ensemble, comptes) quand leur dépôt en publie un ; le picto reste sinon. Nouveau champ de manifeste « logo »."
+    ]
+  },
+  {
     "version": "0.21.1",
     "date": "2026-11-23",
     "points": [

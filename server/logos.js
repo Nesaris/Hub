@@ -94,7 +94,8 @@ export class Logos {
     this.dir = dir; this.lire = fetcher; this.echecs = new Map(); this.enCours = new Map();
     fs.mkdirSync(dir, { recursive: true });
     // Les logos gardés tels que téléchargés, avant le ré-encodage : ils partent.
-    for (const f of fs.readdirSync(dir)) if (!f.endsWith('.png')) fs.rmSync(path.join(dir, f), { force: true });
+    // (Les SVG d'extensions, eux, sont écrits après leur contrôle : ils restent.)
+    for (const f of fs.readdirSync(dir)) if (!f.endsWith('.png') && !/^ext-.+\.svg$/.test(f)) fs.rmSync(path.join(dir, f), { force: true });
   }
 
   fichier(id) { return path.join(this.dir, String(id).replace(/[^a-z0-9_-]/gi, '_') + '.png'); }
@@ -136,5 +137,68 @@ export class Logos {
     return null;
   }
 
+  /**
+   * Le logo qu'une extension publie dans son propre dépôt : le champ « logo »
+   * de son manifeste, sinon les emplacements où on les range d'habitude.
+   * Un fichier par version : une nouvelle version relit son logo.
+   */
+  async extension(id, version, manifeste, lireFichier) {
+    const base = 'ext-' + `${id}@${version}`.replace(/[^a-z0-9_.@-]/gi, '_');
+    for (const ext of ['svg', 'png']) {
+      try { return { buf: fs.readFileSync(path.join(this.dir, `${base}.${ext}`)), type: ext === 'svg' ? 'image/svg+xml' : 'image/png' }; } catch { /* */ }
+    }
+    const cle = base;
+    if (Date.now() - (this.echecs.get(cle) || 0) < REESSAI_MS) return null;
+    if (!this.enCours.has(cle)) this.enCours.set(cle, this.chercherExtension(id, base, manifeste, lireFichier).finally(() => this.enCours.delete(cle)));
+    return this.enCours.get(cle);
+  }
+
+  async chercherExtension(id, base, manifeste, lireFichier) {
+    for (const rel of cheminsLogo(id, manifeste)) {
+      let buf;
+      try { buf = await lireFichier(rel, MAX_IMAGE); } catch { continue; }
+      if (!buf?.length || buf.length > MAX_IMAGE) continue;
+      try {
+        const sortie = /\.svg$/i.test(rel) ? { buf: svgPropre(buf), type: 'image/svg+xml', ext: 'svg' } : { buf: reencoder(buf), type: 'image/png', ext: 'png' };
+        const prefixe = 'ext-' + String(id).replace(/[^a-z0-9_.-]/gi, '_') + '@';
+        for (const f of fs.readdirSync(this.dir)) if (f.startsWith(prefixe)) fs.rmSync(path.join(this.dir, f), { force: true });
+        fs.writeFileSync(path.join(this.dir, `${base}.${sortie.ext}`), sortie.buf, { mode: 0o600 });
+        return { buf: sortie.buf, type: sortie.type };
+      } catch { /* refusé : suivant */ }
+    }
+    this.echecs.set(base, Date.now());
+    return null;
+  }
+
   oublier(id) { try { fs.unlinkSync(this.fichier(id)); } catch { /* */ } this.echecs.delete(id); }
+}
+
+const CHEMIN = /^(?!\/)(?!.*(^|\/)\.\.(\/|$))[\w./-]{1,200}\.(svg|png)$/i;
+/** Où chercher le logo d'une extension, du plus sûr (déclaré) au plus probable. */
+export function cheminsLogo(id, m = {}) {
+  const declares = [m.logo, /\.(svg|png)$/i.test(m.icon || '') ? m.icon : null].filter(x => typeof x === 'string' && CHEMIN.test(x));
+  const habituels = ['web/icone.svg', 'ui/icone.svg', 'medias/icone.svg', 'public/icone.svg', 'assets/icone.svg', 'assets/icon.svg', 'assets/logo.svg',
+    `assets/logo/${id}-logo.svg`, 'web/icon.svg', 'public/icon.svg', 'icon.svg', 'logo.svg', 'web/icone-512.png', 'icon.png', 'logo.png'];
+  return [...new Set([...declares, ...habituels])];
+}
+
+/*
+ * Un SVG peut porter du script, appeler l'extérieur ou ouvrir des entités
+ * XML. Il n'est servi qu'en <img> (où rien de tout cela ne s'exécute) et avec
+ * une politique de contenu fermée ; on ne le garde, en plus, que s'il n'est
+ * fait que de formes : la moindre construction suspecte le fait refuser
+ * entier, on ne tente pas de le « nettoyer ».
+ */
+const INTERDITS = [/<script/i, /<foreignobject/i, /<(iframe|embed|object|image|a|use|animate\w*|set|feimage|audio|video|canvas|handler|listener)\b/i,
+  /<!doctype/i, /<!entity/i, /<\?xml-stylesheet/i, /\son[a-z]+\s*=/i, /javascript:/i, /data:/i, /@import/i, /@font-face/i,
+  /url\(\s*['"]?\s*(?!#)/i, /\b(xlink:)?href\s*=/i, /<!\[cdata\[/i, /&#/];
+export function svgPropre(buf) {
+  let t = buf.toString('utf8');
+  if (t.includes('\uFFFD')) throw new Error('SVG illisible');
+  t = t.replace(/^\uFEFF/, '').replace(/<\?xml[^>]*\?>/i, '').replace(/<!--[\s\S]*?-->/g, '').trim();
+  if (!/^<svg\b[^>]*\bxmlns\s*=\s*["']http:\/\/www\.w3\.org\/2000\/svg["']/i.test(t) || !/<\/svg>$/i.test(t)) throw new Error('pas un SVG');
+  for (const r of INTERDITS) if (r.test(t)) throw new Error('SVG refusé');
+  // La variante sombre d'un logo est blanche : posée sur la tuile blanche du Hub, elle disparaîtrait.
+  t = t.replace(/@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/gi, '');
+  return Buffer.from(t, 'utf8');
 }

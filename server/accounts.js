@@ -58,7 +58,7 @@ export class Accounts {
   services_() {
     return this.services.list().map(i => {
       const m = i.manifest;
-      const base = { id: i.id, name: i.name, ext: m.name, icon: m.icon, status: i.status };
+      const base = { id: i.id, name: i.name, ext: m.name, extId: i.ext_id, icon: m.icon, status: i.status };
       if (m.accounts) {
         const a = m.accounts;
         const cfg = this.services.configOf(i);

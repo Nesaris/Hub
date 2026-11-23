@@ -78,15 +78,18 @@ export class Registry {
     this.audit.write(actor, 'registres.modifiés', null, { list });
   }
 
-  async readFile(origin, rel) {
+  async readFile(origin, rel, max = 10 * 1048576) {
     const p = path.posix.normalize(path.posix.join(origin.dir || '', rel));
     if (p.startsWith('..')) throw new HttpError(400, 'Chemin hors du dépôt');
     if (origin.type === 'local') {
       const racine = path.resolve(origin.root), full = path.resolve(racine, p);
       // Le séparateur compte : « /reg-voisin » commence aussi par « /reg ».
       if (full !== racine && !full.startsWith(racine + path.sep)) throw new HttpError(400, 'Chemin hors du dossier');
+      const st = await fs.promises.stat(full);
+      if (st.size > max) throw new HttpError(413, 'Fichier trop gros');
       return fs.promises.readFile(full);
     }
+    if (origin.type !== 'github' && !origin.base) throw new HttpError(404, 'Pas de fichier pour cette origine');
     // En plus des en-têtes, une adresse neuve à chaque lecture : le CDN range
     // ses copies par adresse complète, une adresse jamais vue ne peut être servie de son cache.
     const url = origin.type === 'github' ? (origin.sha ? rawUrl(origin.repo, origin.sha, p) : `${rawUrl(origin.repo, origin.ref, p)}?t=${Date.now()}`) : `${origin.base}/${p}`;
@@ -94,7 +97,7 @@ export class Registry {
     // dépôt maintenant, pas ce qu'un cache a retenu. Le CDN de
     // raw.githubusercontent garde un fichier plusieurs minutes, ce qui fait
     // qu'un manifeste tout juste poussé n'arrive pas — et rien ne le dit.
-    const res = await sortir(url, { signal: AbortSignal.timeout(20000), headers: { 'cache-control': 'no-cache', pragma: 'no-cache' } });
+    const res = await sortir(url, { signal: AbortSignal.timeout(20000), headers: { 'cache-control': 'no-cache', pragma: 'no-cache' } }, { taille: max });
     if (!res.ok) throw new HttpError(502, `Téléchargement impossible (${res.status}) : ${url}`);
     return Buffer.from(await res.arrayBuffer());
   }

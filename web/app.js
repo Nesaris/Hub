@@ -426,7 +426,7 @@ function contenuDash(o, m) {
         ${m?.sources?.ncpu ? html`<p class="help mt10">${m.sources.ncpu} processeur${m.sources.ncpu > 1 ? 's' : ''}${m.sources.memoire ? ` · ${octets(m.sources.memoire)} de mémoire` : ''}. La part des extensions est rapportée à toute la machine.</p>` : ''}</div></div>
     <div class="card"><header><h2>Services</h2><button class="note link" data-nav="ext">gérer</button></header>
       ${o.services.list.length ? html`<div class="tw"><table><thead><tr><th>Service</th><th class="cache-m">Adresse</th><th class="cache-s">Mode</th><th>État</th></tr></thead><tbody>
-      ${o.services.list.map(s => html`<tr><td class="principal"><div class="who-cell"><span class="itile ${s.status === 'online' ? 'key' : ''}">${I(s.ext.icon || 'server')}</span><div><b>${s.name}</b><small>${s.ext.name} ${s.version}</small></div></div></td><td class="mono cache-m">${adresseService(s) || '—'}</td><td class="cache-s">${s.mode === 'remote' ? html`<span class="chip">distant</span>` : html`<span class="chip a">installé ici</span>`}</td><td>${statusTag(s.status)}${s.statusDetail ? html`<div class="mini">${s.statusDetail}</div>` : ''}</td></tr>`)}
+      ${o.services.list.map(s => html`<tr><td class="principal"><div class="who-cell">${tuileExt(s.extId, s.ext.icon, s.miseAJour || s.version, s.status === 'online' ? 'key' : '')}<div><b>${s.name}</b><small>${s.ext.name} ${s.version}</small></div></div></td><td class="mono cache-m">${adresseService(s) || '—'}</td><td class="cache-s">${s.mode === 'remote' ? html`<span class="chip">distant</span>` : html`<span class="chip a">installé ici</span>`}</td><td>${statusTag(s.status)}${s.statusDetail ? html`<div class="mini">${s.statusDetail}</div>` : ''}</td></tr>`)}
       </tbody></table></div>` : html`<div class="list-empty">Aucun service. Ouvre Extensions pour installer ou connecter ton premier service.</div>`}
     </div>
     </div>
@@ -490,6 +490,8 @@ function bindCommon(el) {
 
 // Extensions
 const pictoService = ic => (P[ic] ? ic : 'server');
+// La tuile d'un service : son logo, s'il en publie un dans son dépôt ; le picto sinon (et le temps qu'il arrive).
+const tuileExt = (extId, icone, v = '', cls = '') => html`<span class="itile logo-ext ${cls}">${I(pictoService(icone))}${extId ? html`<img alt="" loading="lazy" decoding="async" src="/api/extensions/${encodeURIComponent(extId)}/logo${v ? '?v=' + encodeURIComponent(v) : ''}">` : ''}</span>`;
 async function viewExt(el, t) {
   const [cat, inst] = await Promise.all([GET('/api/catalog'), GET('/api/instances')]);
   if (!alive(t)) return;
@@ -508,7 +510,7 @@ async function viewExt(el, t) {
       const m = it.manifest;
       const caps = l => (l || []).map(c => html`<span class="chip m">${c}</span>`);
       return html`<div class="card ext">
-        <header><span class="itile">${I(pictoService(m.icon))}</span><div class="grow"><h2>${m.name}</h2><p class="mini">${it.adapte ? `github.com/${it.adapte.repo}` : `${m.version} · ${it.source}`}</p></div>${it.adapte ? html`<span class="chip m" title=${`Adaptée par l’IA (${it.adapte.modele || 'IA du Hub'}) depuis le commit ${String(it.adapte.sha).slice(0, 12)}`}>${I('sparkle', 12)}adaptée par l’IA</span>` : ''}</header>
+        <header>${tuileExt(m.id, m.icon, m.version)}<div class="grow"><h2>${m.name}</h2><p class="mini">${it.adapte ? `github.com/${it.adapte.repo}` : `${m.version} · ${it.source}`}</p></div>${it.adapte ? html`<span class="chip m" title=${`Adaptée par l’IA (${it.adapte.modele || 'IA du Hub'}) depuis le commit ${String(it.adapte.sha).slice(0, 12)}`}>${I('sparkle', 12)}adaptée par l’IA</span>` : ''}</header>
         <div class="body"><p>${m.description}</p>
           <dl class="caps"><dt>Fournit</dt><dd>${m.capabilities.provides?.length ? caps(m.capabilities.provides) : '—'}</dd>
           ${m.capabilities.requires?.length ? html`<dt>Requiert</dt><dd>${caps(m.capabilities.requires)}</dd>` : ''}
@@ -521,7 +523,7 @@ async function viewExt(el, t) {
     })}</div>` : html`<div class="card list-empty">${cat.items.length ? 'Tout le catalogue est déjà en service. Retrouve-les dans « Mes services ».' : html`Catalogue vide. ${cat.errors.length ? cat.errors.map(e => html`<br><span class="err">${e.error}</span>`) : 'Vérifie les registres.'}`}</div>`;
   } else if (S.extTab === 'installed') {
     corps = html`<div class="card">${inst.length ? inst.map(i => html`<div class="flowrow svc" data-inst=${i.id} tabindex="0" role="button">
-        <span class="itile ${i.status === 'online' ? 'key' : ''}">${I(pictoService(i.ext.icon))}</span>
+        ${tuileExt(i.extId, i.ext.icon, i.miseAJour || i.version, i.status === 'online' ? 'key' : '')}
         <div class="svc-t"><strong>${i.name}</strong><div class="chain une-ligne">${i.ext.name} ${i.version}${adresseService(i) ? html` <span class="ar">·</span> <span class="tronque" title=${adresseService(i)}>${adresseService(i)}</span>` : ''}</div>${i.statusDetail ? html`<div class="svc-detail" title=${i.statusDetail}>${i.statusDetail}</div>` : ''}</div>
         <div class="fin">
           ${(i.open || []).slice(0, 1).map(urlOuverture).filter(u => /^https?:/.test(u)).map(u => html`<a class="btn sm cache-s" href=${u} target="_blank" rel="noopener" data-lien-externe>${I('globe', 14)}Ouvrir</a>`)}
@@ -1027,7 +1029,7 @@ async function viewUsers(el, t) {
   };
   poser(el, headrow('Comptes des services', 'Les comptes de chaque service, gérés ici. Chaque service demande de confirmer ton identité à l’entrée.'),
     services.length ? html`<div class="card">${services.map(sv => html`<div class=${sv.gestion === 'hub' ? 'flowrow svc' : 'flowrow svc fixe'} data-svc=${sv.gestion === 'hub' ? sv.id : null} tabindex=${sv.gestion === 'hub' ? '0' : null} role=${sv.gestion === 'hub' ? 'button' : null}>
-        <span class="itile ${sv.status === 'online' ? 'key' : ''}">${I(pictoService(sv.icon))}</span>
+        ${tuileExt(sv.extId, sv.icon, sv.version || '', sv.status === 'online' ? 'key' : '')}
         <div class="svc-t"><strong>${sv.name}</strong><div class="chain">${sv.ext} <span class="ar">·</span> ${detail(sv)}</div></div>
         <div class="fin">${fin(sv)}<div class="svc-etat">${statusTag(sv.status)}</div></div>
       </div>`)}</div>`
@@ -2514,6 +2516,10 @@ function logoTuile(id, nom, couleur, taille = 44, domaine = '') {
   return html`<span class="logo" style=${{ '--c': couleurDe(nom, couleur), '--t': `${taille}px` }}><span class="mono-l">${lettres}</span><img alt="" loading="lazy" src="/api/secrets/logo/${encodeURIComponent(id)}${domaine ? '?d=' + encodeURIComponent(domaine) : ''}"></span>`;
 }
 // La politique de contenu interdit les gestionnaires en ligne : l'échec d'un logo se traite ici.
+// Pareil pour les logos d'extensions, partout d'un coup : load et error ne
+// remontent pas, mais se captent sur le document.
+document.addEventListener('load', e => { if (e.target?.matches?.('.logo-ext img') && e.target.naturalWidth) e.target.parentElement.classList.add('a-logo'); }, true);
+document.addEventListener('error', e => { if (e.target?.matches?.('.logo-ext img')) e.target.remove(); }, true);
 function brancherLogos(root) {
   $$('.logo img', root).forEach(img => {
     const ok = () => img.closest('.logo')?.classList.add('a-logo');

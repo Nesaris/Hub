@@ -126,6 +126,15 @@ export function registerRoutes(routeur, h) {
   const vueAdaptee = o => (o?.type === 'adapte' ? { repo: o.repo, sha: o.sha, licence: o.licence, licenceNom: o.licenceNom, obligations: o.obligations || [], modele: o.modele, le: o.le, compose: o.compose } : null);
   r.get('/api/catalog', () => ({ sources: registry.sources(), refreshed: db.setting('registry_refreshed'), errors: registry.errors, items: registry.list().map(e => ({ id: e.id, source: e.source, version: e.version, manifest: e.manifest, ...(e.origin?.type === 'adapte' ? { adapte: vueAdaptee(e.origin) } : {}) })) }));
   // Les registres tels qu'on les lit : leur lien, ce qu'ils apportent, et les dépôts sans manifeste que l'IA peut adapter.
+  // Le logo qu'une extension publie dans son dépôt (sinon : 404, et l'interface garde le picto).
+  r.get('/api/extensions/:id/logo', async ctx => {
+    let e; try { e = registry.get(ctx.params.id); } catch { throw new HttpError(404, 'Pas de logo'); }
+    const l = await logos?.extension(e.id, e.version, e.manifest, (rel, max) => registry.readFile(e.origin, rel, max)).catch(() => null);
+    if (!l) throw new HttpError(404, 'Pas de logo');
+    ctx.res.writeHead(200, { 'Content-Type': l.type, 'Content-Length': l.buf.length, 'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Content-Disposition': 'attachment; filename="logo"', 'Cross-Origin-Resource-Policy': 'same-origin' });
+    ctx.res.end(l.buf);
+  }, { stream: true });
   r.get('/api/catalog/registres', () => {
     const lignes = registry.list();
     return {

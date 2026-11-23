@@ -45,6 +45,11 @@
       "type": "string",
       "description": "Nom d'un picto du Hub (server, memory, ticket, map, mail, mic, chip, router…) ou chemin relatif vers un SVG 24x24 au trait."
     },
+    "logo": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[\\w./-]{1,200}\\.(svg|png)$",
+      "description": "Chemin, dans le dépôt, du logo de l'extension (SVG fait de formes seulement, ou PNG). Sans ce champ, le Hub cherche aux emplacements habituels (web/icone.svg, medias/icone.svg, assets/icon.svg…)."
+    },
     "repository": {
       "type": "string",
       "format": "uri"

@@ -133,6 +133,8 @@ export const SCHEMAS = {
   'DELETE /api/secrets/:service': { corps: VIDE },
   // ?d= : le domaine, qui change l'adresse de l'image quand le site d'une clé change.
   'GET /api/secrets/logo/:id': { requete: { d: TXT(253) } },
+  // ?v= : la version, qui change l'adresse de l'image quand l'extension change.
+  'GET /api/extensions/:id/logo': { requete: { v: TXT(60) } },
 
   'PUT /api/variables/:key': { corps: { value: TXT(10000), secret: OUI } },
   'DELETE /api/variables/:key': { corps: VIDE },

@@ -58,6 +58,11 @@ pre.json{font:11.5px/1.65 var(--mono);background:var(--well);color:var(--ink-sof
 button.chip{cursor:pointer}
 .itile.ink{background:var(--ink);color:var(--paper)}
 .itile.sm{width:24px;height:24px;border-radius:7px}
+.itile.logo-ext{position:relative;overflow:hidden}
+.logo-ext img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;padding:17%;opacity:0;transition:opacity .2s}
+.logo-ext.a-logo{background:#fff;box-shadow:inset 0 0 0 1px var(--hair)}
+.logo-ext.a-logo img{opacity:1}
+.logo-ext.a-logo>svg{visibility:hidden}
 .tag.busy .d{background:var(--warn);animation:blink .7s infinite alternate}
 .maj-pastille{display:inline-flex;align-items:center;vertical-align:middle;margin-left:6px;padding:3px 6px;border-radius:6px;background:var(--accent);color:var(--on-ink);font-family:var(--mono);font-size:10px;font-weight:600;line-height:1}
 /* Dans le rail, la pastille tient dans la ligne du lien, centrée sur son texte. */

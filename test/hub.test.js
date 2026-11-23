@@ -29,9 +29,18 @@ const FIX = path.join(import.meta.dirname, 'fixtures');
   // Un mode « aucune » en plus : le lien IA d'un service sans IA doit exister quand même.
   const sm = JSON.parse(fs.readFileSync(path.join(FIX, 'synapse.hub.json'), 'utf8'));
   sm.config.find(f => f.key === 'LLM_FOURNISSEUR').options.push({ value: 'aucune', label: 'Aucune — sans IA' });
+  sm.logo = 'logos/synapse.svg';
   fs.writeFileSync(path.join(reg, 'm/synapse.json'), JSON.stringify(sm));
 }
-fs.copyFileSync(path.join(FIX, 'vox.hub.json'), path.join(reg, 'm/vox.json'));
+{
+  // Les logos que les extensions publient : un propre, un piégé.
+  fs.mkdirSync(path.join(reg, 'm/logos'), { recursive: true });
+  fs.writeFileSync(path.join(reg, 'm/logos/synapse.svg'), '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><style>path{fill:#000}@media (prefers-color-scheme: dark){path{fill:#fff}}</style><path d="M1 1H31V31Z"/></svg>');
+  fs.writeFileSync(path.join(reg, 'm/logos/vox.svg'), '<svg xmlns="http://www.w3.org/2000/svg"><script>fetch("/api/secrets")</script></svg>');
+  const vm = JSON.parse(fs.readFileSync(path.join(FIX, 'vox.hub.json'), 'utf8'));
+  vm.logo = 'logos/vox.svg';
+  fs.writeFileSync(path.join(reg, 'm/vox.json'), JSON.stringify(vm));
+}
 fs.copyFileSync(path.join(import.meta.dirname, '../registry-local/manifests/ollama.hub.json'), path.join(reg, 'm/ollama.json'));
 fs.writeFileSync(path.join(reg, 'index.json'), JSON.stringify({ extensions: [
   { id: 'docker-control', manifest: 'm/docker-control.json' },
@@ -715,6 +724,25 @@ test('clés & API : catalogue rangé, site personnalisé, logo absent = 404 sans
   await api('DELETE', `/api/secrets/${encodeURIComponent('Outil Maison')}`);
   const anon = await fetch(`${base}/api/secrets/logo/github`);
   assert.equal(anon.status, 401, 'logo réservé aux administrateurs connectés');
+});
+
+test('logos des extensions : pris dans leur dépôt, SVG contrôlé et servi fermé, picto sinon', async () => {
+  const r = await admin.get('/api/extensions/synapse/logo?v=1');
+  assert.equal(r.status, 200);
+  assert.equal(r.entetes['content-type'], 'image/svg+xml');
+  assert.match(r.entetes['content-security-policy'], /default-src 'none'.*sandbox/);
+  assert.equal(r.entetes['x-content-type-options'], 'nosniff');
+  const svg = r.texte;
+  assert.ok(svg.startsWith('<svg') && !/prefers-color-scheme/.test(svg), 'sans prologue ni variante sombre (blanche sur la tuile blanche)');
+  assert.equal((await admin.get('/api/extensions/vox/logo')).status, 404, 'un SVG qui porte du script est refusé entier');
+  assert.equal((await admin.get('/api/extensions/docker-control/logo')).status, 404, 'pas de logo : le picto reste');
+  assert.equal((await admin.get('/api/extensions/inconnue/logo')).status, 404);
+  assert.equal((await fetch(`${base}/api/extensions/synapse/logo`)).status, 401, 'réservé aux connectés');
+  // Un chemin qui sort du dépôt ne passe pas le manifeste.
+  const { validateManifest } = await import('../server/registry.js');
+  const m = JSON.parse(fs.readFileSync(path.join(FIX, 'vox.hub.json'), 'utf8'));
+  assert.ok(validateManifest({ ...m, logo: 'medias/icone.svg' }).valid);
+  for (const logo of ['../secret.svg', '/etc/x.svg', 'a/../../b.png', 'x.html']) assert.ok(!validateManifest({ ...m, logo }).valid, logo);
 });
 
 test('IA par abonnement : Claude Code et Codex sont des connexions comme les autres, lancées par le pont', async () => {
