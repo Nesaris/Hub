@@ -1511,6 +1511,14 @@ test('réponses instantanées : l’état des services et un bonjour ne passent 
   assert.match(s2.reply, /^Salut ! (Au passage|Tout tourne)/);
   assert.doesNotMatch(s2.reply, /Ça va/);
   assert.match((await api('POST', '/api/agent/ask', { text: 'bonsoir' })).reply, /^Bonsoir !/);
+  // « Qu'est-ce qui est hors ligne ? » : l'état, tout de suite, sans le modèle.
+  const hl = await api('POST', '/api/agent/ask', { text: 'qu’est-ce qui est hors ligne ?' });
+  assert.equal(hl.model, 'Hub');
+  // « Mets à jour X » quand X est déjà à jour : on le dit, sans plan.
+  const nomSvc = (await api('GET', '/api/instances'))[0].name;
+  const mj = await api('POST', '/api/agent/ask', { text: `mets à jour ${nomSvc}` });
+  assert.equal(mj.model, 'Hub');
+  assert.ok(/déjà à jour|→/.test(mj.reply), mj.reply);
   assert.equal(fake.state.chats.slice(avant).filter(x => x.messages[0]?.content?.includes('assistant de configuration')).length, 0, 'aucun appel au modèle');
 });
 

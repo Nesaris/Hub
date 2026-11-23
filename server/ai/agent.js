@@ -818,7 +818,15 @@ ${JSON.stringify(this.donneesConversation(ctx))}
    * temps — c'est lui qui compte.
    */
   donneesStables(ctx) {
-    const d = { resume: this.resume(ctx), services: ctx.instances, workflows: ctx.workflows, connexions_ia: ctx.ai, ia_possibles: IA_POSSIBLES,
+    /* Les services en bref : le détail complet (déclencheurs, paramètres,
+       réglages) de tous à la fois dépassait le contexte d'un petit modèle
+       local (32 k jetons) — il perdait ses consignes et répondait à côté. Le
+       détail des services nommés dans la demande arrive avec elle, et « lire »
+       donne celui des autres. */
+    const services = ctx.instances.map(i => ({ id: i.id, name: i.name, extension: i.extension, mode: i.mode, status: i.status, ...(i.detail ? { detail: i.detail } : {}),
+      version: i.version, ...(i.miseAJour ? { miseAJour: i.miseAJour } : {}), ...(i.ia ? { ia: i.ia } : {}),
+      actions: i.actions.map(a => `${a.id}${a.risk && a.risk !== 'read' ? ` (${a.risk})` : ''}`), ...(i.triggers.length ? { declencheurs: i.triggers.map(t => t.id) } : {}) }));
+    const d = { resume: this.resume(ctx), services, workflows: ctx.workflows, connexions_ia: ctx.ai, ia_possibles: IA_POSSIBLES,
       canaux_par_defaut: this.canauxParDefaut(),
       cles_et_api: ctx.secrets, canaux: ctx.canaux, catalogue: ctx.catalog,
       // Tout ce que l'interface fait et que l'outil « hub » peut faire, et ce qu'il peut lire.
@@ -892,7 +900,8 @@ ${JSON.stringify(this.donneesConversation(ctx))}
       if (d) { direct = d; direct.ia.texte = `${prec.request} ${text}`; }
     }
     if (direct?.ia) Object.assign(direct, await this.reponseIA(direct.ia.instance, direct.ia.texte || text));
-    if (direct?.majs) Object.assign(direct, await this.reponseMajs());
+    if (direct?.majs) Object.assign(direct, await this.reponseMajs(direct.cibles));
+    if (direct?.acces) Object.assign(direct, await this.reponseAcces(direct.acces, text));
     if (direct?.exposer) Object.assign(direct, await this.reponseExposer(text));
     // « Connecte le bot Telegram qui correspond à Relay » : le bot par son nom, sans le modèle.
     if (direct?.bot) Object.assign(direct, this.bots.reponseBrancher(text));
@@ -954,7 +963,10 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     const attente = enAttente && text === affiche ? { choix_de_compte_en_attente: { comptes: enAttente.choix.map(c => ({ canal: c.canal, conseille: c.recommande, pourquoi: c.pourquoi || undefined, workflows: (ctx.canaux.find(x => x.canal === c.canal)?.workflows || []) })) } } : {};
     const enCours = this.conversation ? { conversation_telegram_en_cours: { canal: this.conversation.canal, echanges: this.conversation.tour, ecoute: !!this.ecoute } } : { conversation_telegram_en_cours: null };
     const aVoixHaute = voix ? '\n\n(Réponse LUE À VOIX HAUTE : "reply" fait une à trois phrases parlées, naturelles, sans liste, sans markdown, sans emoji. Les chiffres détaillés passent par les widgets, choisis-les librement si la question porte sur des données.)' : '';
-    const content = `<donnees>\n${JSON.stringify({ mémoire: brief.souvenirs, profil: brief.profil, corrections_passées: brief.corrections, ...(brief.cerveaux?.length ? { autres_cerveaux: brief.cerveaux } : {}), ...enCours, ...attente })}\n</donnees>\n\nDemande : ${text}${aVoixHaute}`;
+    // Le détail complet des services que la demande nomme (au plus trois).
+    const nommes = new Set(this.servicesCites(text).slice(0, 3).map(i => i.id));
+    const detailServices = ctx.instances.filter(i => nommes.has(i.id));
+    const content = `<donnees>\n${JSON.stringify({ mémoire: brief.souvenirs, profil: brief.profil, corrections_passées: brief.corrections, ...(brief.cerveaux?.length ? { autres_cerveaux: brief.cerveaux } : {}), ...(detailServices.length ? { services_nommes_en_detail: detailServices } : {}), ...enCours, ...attente })}\n</donnees>\n\nDemande : ${text}${aVoixHaute}`;
     // L'assistant répond en JSON — un plan, pas une prose. On ne peut donc pas
     // afficher les jetons bruts : ce serait des accolades. Mais la clé `reply`
     // est écrite en premier, et c'est elle que l'on veut voir se former. On
@@ -999,6 +1011,18 @@ ${JSON.stringify(this.donneesConversation(ctx))}
         const aLire = this.servicesCites(`${text} ${r.json.reply}`).slice(0, 3).map(i => ({ quoi: 'service', nom: i.name }));
         if (aLire.length) r.json.lire = aLire;
       }
+      /* « Liste les appareils de MapMyLAN » : un plan fait seulement
+         d'actions de lecture n'attend pas de clic — on les lit tout de suite
+         et il répond avec les données, au lieu d'annoncer une liste vide. */
+      if (r.json && !(Array.isArray(r.json.lire) && r.json.lire.length) && Array.isArray(r.json.steps) && r.json.steps.length && r.json.steps.length <= 3) {
+        const lectures = r.json.steps.map(st => {
+          if (st?.tool !== 'run_action' || !st.args?.instance || !st.args?.action) return null;
+          let inst; try { inst = this.services.get(st.args.instance); } catch { return null; }
+          const a = (inst.manifest.actions || []).find(x => x.id === st.args.action);
+          return a?.risk === 'read' ? { quoi: 'action', instance: inst.name, action: a.id, params: st.args.params || {} } : null;
+        });
+        if (lectures.every(Boolean)) { r.json.lire = lectures; r.json.steps = []; }
+      }
       for (let tour = 0; tour < 1 && Array.isArray(r.json?.lire) && r.json.lire.length; tour++) {
         const quoi = r.json.lire.map(d => [d.quoi, d.nom || d.action || d.id || d.q].filter(Boolean).join(' ')).join(', ');
         if (this.courant) Object.assign(this.courant, { texte: `Je regarde : ${quoi}…`, phase: 'lecture' });
@@ -1031,6 +1055,10 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     const out = r.json;
     let final = out;
     let steps = await this.reviewAll(out.steps, ctx);
+    // « Crée un workflow qui m'envoie… » : un NOUVEAU workflow, pas un envoi greffé sur ceux qui existent.
+    if (/\b(cr[ée]e|cr[ée]er|fais|fabrique|monte|ajoute)\w*\b.{0,20}\b(un|nouveau)\b.{0,15}\bworkflow/i.test(text)) {
+      for (const st of steps) if (st.tool === 'ajouter_envoi') st.problems.push('La demande crée UN NOUVEAU workflow : utilise create_workflow (déclencheur, lecture, envoi), pas ajouter_envoi, qui modifie des workflows existants.');
+    }
     /* Un plan qui ne tient pas debout repart une fois chez le modèle, avec
        les problèmes que le Hub a trouvés. Sans cette passe, il créait des
        workflows impossibles à activer et laissait l'utilisateur les réparer. */
@@ -1379,11 +1407,18 @@ ${JSON.stringify(this.donneesConversation(ctx))}
   }
 
   /** Ce que ce service utilise comme IA, en clair, pour le contexte du modèle. */
+  /** Ce qui sert vraiment l'IA d'un service : la passerelle du Hub s'il passe par elle, sinon son Ollama. */
+  fournisseurReel(i) {
+    const p = this.services.iaServices;
+    if (p?.utilise?.(i)) return { id: null, name: 'IA du Hub', config: { DEFAULT_MODEL: p.modeleParDefaut(i) } };
+    return this.fournisseurIA(i);
+  }
+
   iaDe(i) {
-    let e; try { e = etatIA(i, this.fournisseurIA(i)); } catch { return undefined; }
+    let e; try { e = etatIA(i, this.fournisseurReel(i)); } catch { return undefined; }
     if (!e) return undefined;
     return {
-      locale: e.local ? `${e.modele || `${e.modeleParDefaut || '?'} (défaut d'Ollama)`} sur ${e.fournisseur.name}` : e.localSansFournisseur ? 'choisie, mais aucun Ollama installé' : null,
+      locale: e.local ? `${e.modele || `${e.modeleParDefaut || '?'} (par défaut)`} sur ${e.fournisseur.name}` : e.localSansFournisseur ? 'choisie, mais aucun Ollama installé' : null,
       nuage: e.nuage ? `${e.nuageNom || '?'}${e.modeleNuage ? ` · ${e.modeleNuage}` : ''}` : null,
       ...(e.modeLibelle ? { mode: e.modeLibelle } : {}),
     };
@@ -1459,8 +1494,9 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     const p = await this.preparerIA({ instance: inst.name, modele: cite.trouve });
     if (p.problems.length) return { reponse: p.problems.join('\n') };
     const lien = this.store.list().find(w => w.autoKey === `ia:${inst.id}`);
-    const quel = p.args.modele || p.e?.modele || p.e?.modeleParDefaut || 'le modèle par défaut';
-    if (p.deja) return { reponse: `C’est déjà fait : **${inst.name}** se sert de **${quel}** sur **${f.name}**${p.args.modeLibelle ? ` (mode ${p.args.modeLibelle})` : ''}.${lien ? ` Le lien est dans Workflows : « ${lien.name} ».` : ''}` };
+    const reel = this.fournisseurReel(inst);
+    const quel = p.args.modele || p.e?.modele || (reel?.name === 'IA du Hub' ? reel.config.DEFAULT_MODEL : p.e?.modeleParDefaut) || 'le modèle par défaut';
+    if (p.deja) return { reponse: `C’est déjà fait : **${inst.name}** se sert de **${quel}** sur **${reel?.name === 'IA du Hub' ? 'l’IA du Hub' : f.name}**${p.args.modeLibelle ? ` (mode ${p.args.modeLibelle})` : ''}.${lien ? ` Le lien est dans Workflows : « ${lien.name} ».` : ''}` };
     const verifie = cite.trouve ? `**${cite.trouve}** est bien installé sur **${f.name}**. ` : '';
     const maj = p.args.majDabord ? ` ${inst.name} ${inst.version} ne sait pas choisir son modèle : je le mets d’abord à jour en ${p.args.majDabord}.` : '';
     return { reply: `${verifie}Je branche **${inst.name}** dessus${p.args.modeLibelle ? `, mode **${p.args.modeLibelle}**` : ''}.${maj} Le lien apparaîtra dans Workflows.`,
@@ -1473,12 +1509,45 @@ ${JSON.stringify(this.donneesConversation(ctx))}
   }
 
   /** « Lance les mises à jour dispo » : le catalogue relu à l'instant, puis une étape par service en retard. */
-  async reponseMajs() {
+  /**
+   * Un nom pour un service : <préfixe>.<domaine>, par le tunnel Cloudflare s'il
+   * est branché, sinon par l'adresse publique — la même route que la page
+   * Connexions, donc la même confirmation par clé d'accès.
+   */
+  async reponseAcces(id, texte) {
+    const c = this.connexions;
+    if (!c?.relay()) return { reponse: 'Pour donner une adresse à un service, il faut **Relay** : installe-le depuis **Extensions**, puis redemande-moi.' };
+    let etat;
+    try { etat = await c.etat(); } catch (e) { return { reponse: `Relay ne répond pas : ${e.message}` }; }
+    const s = (etat.services || []).find(x => x.id === id);
+    if (!s) return { reponse: 'Ce service ne tourne pas sur cette machine : son adresse se règle là où il tourne.' };
+    if (!s.cible) return { reponse: `**${s.nom}** n’a pas d’interface web à publier.` };
+    const domaines = [...new Set([...(etat.domaines || []).map(d => d.nom || d), ...(etat.zonesCloudflare || []).map(z => z.nom || z.name || z)].map(String).filter(Boolean))];
+    if (!domaines.length) return { reponse: 'Aucun domaine dans **Connexions** : ajoute le tien (Connexions → Domaines), puis redemande-moi.' };
+    // Un nom écrit en entier dans la demande (« sur console.zeylab.tech ») l'emporte.
+    const ecrit = /\b([a-z0-9][a-z0-9-]{0,62})\.([a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/i.exec(texte);
+    const domaine = ecrit && domaines.includes(ecrit[2].toLowerCase()) ? ecrit[2].toLowerCase() : domaines[0];
+    const prefixe = ecrit && domaines.includes(ecrit[2].toLowerCase()) ? ecrit[1].toLowerCase() : s.nom.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
+    const mode = /r[ée]seau local|\blocal\b/i.test(texte) && !/internet/i.test(texte) ? 'local' : etat.cloudflare ? 'cloudflare' : 'public';
+    const hote = `${prefixe}.${domaine}`;
+    const route = (etat.routes || []).find(x => x.hote === hote);
+    const surInternet = r => !!(r && (r.cf || r.mode === 'public' || r.mode === 'cloudflare'));
+    const deja = route && (mode === 'local' ? !surInternet(route) : surInternet(route));
+    if (deja) return { reponse: `**${s.nom}** a déjà son adresse : ${mode === 'local' ? 'http' : 'https'}://${hote}` };
+    const comment = { cloudflare: 'par le tunnel Cloudflare, sans port ouvert chez toi', public: 'par ton adresse publique', local: 'sur ton réseau local seulement' }[mode];
+    return {
+      reply: `Je publie **${s.nom}** sur **https://${hote}**, ${comment}.${domaines.length > 1 ? ` Autres domaines possibles : ${domaines.filter(d => d !== domaine).join(', ')} — dis par exemple « sur ${prefixe}.${domaines.find(d => d !== domaine)} ».` : ''} Tu confirmeras avec ta clé d’accès.`,
+      steps: [{ tool: 'hub', args: { action: `PUT /api/connexions/services/${id}`, corps: { hote, mode }, titre: `Publier ${s.nom} sur ${mode === 'local' ? 'http' : 'https'}://${hote}` } }],
+    };
+  }
+
+  async reponseMajs(cibles = []) {
     let note = '';
     try { await Promise.race([this.registry.refresh('assistant'), new Promise((_, ko) => setTimeout(() => ko(new Error('lent')), 20000))]); }
     catch (e) { note = ` (catalogue pas relu : ${e.message} — je me fie à la dernière lecture)`; }
-    const tous = this.services.list();
+    const tous = this.services.list().filter(i => !cibles.length || cibles.includes(i.id));
     const enRetard = tous.map(i => ({ i, v: this.majDe(i) })).filter(x => x.v);
+    if (!enRetard.length && cibles.length) return { reponse: `Catalogue relu à l’instant${note} : ${tous.map(i => `**${i.name}** est déjà à jour (${i.version})`).join(', ')}. Rien à faire.` };
     if (!enRetard.length) {
       return { reponse: `Catalogue relu à l’instant${note} : tout est à jour.\n${tous.map(i => `- **${i.name}** ${i.version}`).join('\n')}\n\nLe Hub lui-même ne se met pas à jour par le catalogue.` };
     }
@@ -1551,12 +1620,20 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     const plusieurs = this.plusieursIA(t);
     if (plusieurs) return plusieurs;
     if (this.bots?.estBrancher(t)) return { bot: true };
+    // « Fais-moi un accès internet pour NexArc » : un nom pour UN service, pas tout le parc.
+    if (t.length <= 200 && !/\?\s*$/.test(t) && /(acc[eè]s|accessible|joignable|publi|adresse|url|nom de domaine|sous-domaine|lien)/i.test(t)
+      && /(internet|ext[ée]rieur|dehors|partout|public|en ligne|domaine|url|adresse)/i.test(t) && !/workflow|\btous\b|\btout\b/i.test(t)) {
+      const cites = this.servicesCites(t);
+      if (cites.length === 1) return { acces: cites[0].id };
+    }
     const ia = this.intentionIA(t);
     if (ia) return ia;
     // « Expose tout en ligne », « mets le hub sur Internet » : le tunnel, sans le modèle.
     if (t.length <= 200 && !/\?\s*$/.test(t) && (/(expos|mets?\b|met\b|publi|ouvr|rend)\w*.{0,50}(internet|en ligne|partout|public|l['’]ext[ée]rieur|dehors|n['’]importe o[uù]|cloudflare|tunnel)/i.test(t) || /(accessible|joignable)\w*.{0,30}(de partout|partout|internet|l['’]ext[ée]rieur)/i.test(t)) && !/workflow/i.test(t)) return { exposer: true };
     // « Lance les mises à jour dispo », « y a des mises à jour ? » : le catalogue répond, pas le modèle.
-    if (t.length <= 160 && /mises? [àa] jour|\bmaj\b|\bupdates?\b/i.test(t) && !/workflow|surveill|notif|pr[ée]vien|alerte|pourquoi|[ée]chou|erreur/i.test(t)) return { majs: true };
+    if (t.length <= 160 && /mises? [àa] jour|\bmets? [àa] jour|\bmaj\b|\bupdates?\b|\bactualise/i.test(t) && !/workflow|surveill|notif|pr[ée]vien|alerte|pourquoi|[ée]chou|erreur|catalogue/i.test(t)) return { majs: true, cibles: this.servicesCites(t).map(i => i.id) };
+    // « Qu'est-ce qui est hors ligne ? » : l'état des services, tout de suite.
+    if (t.length <= 90 && /hors[- ]ligne|en panne|\bdown\b|plant[ée]|ne r[ée]pond|marche pas|injoignable|est[- ]ce que tout (marche|tourne|va)/i.test(t) && !/pourquoi|r[ée]pare|corrige|relance|red[ée]marr/i.test(t)) return { donnees: [{ type: 'services' }] };
     if (t.length > 160 || t.startsWith('📩')) return null;
     // « Range mes workflows » : une proposition calculée, à valider.
     // « Re-range au cas où », « vérifie le rangement » : même chose, en repartant de zéro.

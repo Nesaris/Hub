@@ -1,5 +1,16 @@
 [
   {
+    "version": "0.20.0",
+    "date": "2026-11-23",
+    "points": [
+      "Assistant plus juste avec une IA locale : ce qu’il reçoit à chaque demande est presque deux fois plus court (il dépassait la mémoire d’un modèle 9B et perdait ses consignes) ; le détail d’un service arrive quand la demande le nomme.",
+      "« Fais-moi un accès internet pour <service> » dans le Hub : l’adresse est proposée tout de suite (préfixe et domaine), à confirmer avec ta clé d’accès.",
+      "« Mets à jour <service> » et « qu’est-ce qui est hors ligne ? » répondent tout de suite, sans passer par le modèle.",
+      "Une demande qui ne fait que lire (« liste les appareils de MapMyLAN ») est lue tout de suite : la réponse arrive avec les données, sans clic.",
+      "L’IA d’un service qui passe par l’IA du Hub est annoncée avec le bon modèle."
+    ]
+  },
+  {
     "version": "0.19.3",
     "date": "2026-11-23",
     "points": [
