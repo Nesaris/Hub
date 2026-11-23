@@ -1514,6 +1514,13 @@ test('réponses instantanées : l’état des services et un bonjour ne passent 
   // « Qu'est-ce qui est hors ligne ? » : l'état, tout de suite, sans le modèle.
   const hl = await api('POST', '/api/agent/ask', { text: 'qu’est-ce qui est hors ligne ?' });
   assert.equal(hl.model, 'Hub');
+  // « Liste les conteneurs de X » : lu chez le service et donné tel quel, sans le modèle.
+  const dcNom = (await api('GET', '/api/instances')).find(i => i.extId === 'docker-control' || i.manifest?.id === 'docker-control')?.name;
+  if (dcNom) {
+    const li = await api('POST', '/api/agent/ask', { text: `liste les conteneurs de ${dcNom}` });
+    assert.equal(li.model, 'Hub', li.reply);
+    assert.match(li.reply, /élément/);
+  }
   // « Mets à jour X » quand X est déjà à jour : on le dit, sans plan.
   const nomSvc = (await api('GET', '/api/instances'))[0].name;
   const mj = await api('POST', '/api/agent/ask', { text: `mets à jour ${nomSvc}` });

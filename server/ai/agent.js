@@ -979,7 +979,30 @@ ${JSON.stringify(this.donneesConversation(ctx))}
       if (choix) {
         if (this.courant) Object.assign(this.courant, { texte: `Je regarde : ${i.name} › ${choix.name || choix.id}…`, phase: 'lecture' });
         this.signaler('agent.token', { text: `Je regarde : ${i.name} › ${choix.name || choix.id}…`, etapes: -1 });
-        luAvant = (await this.lire([{ quoi: 'action', instance: i.name, action: choix.id, params: {} }]))[0];
+        const demande = { quoi: 'action', instance: i.name, action: choix.id };
+        let brut;
+        try { brut = await this.runtime.action(i, choix.id, {}); } catch (e) { luAvant = { demande, erreur: e.message }; }
+        if (brut !== undefined) {
+          const t = JSON.stringify(brut);
+          luAvant = { demande, resultat: t.length > 6000 ? `${t.slice(0, 6000)}… (tronqué)` : brut };
+          /* « Liste les appareils… » : une liste se donne telle quelle, tout de
+             suite — un petit modèle s'égarait dans 6 000 caractères de JSON. */
+          const liste = Array.isArray(brut) ? brut : brut && typeof brut === 'object' ? (['items', 'devices', 'appareils', 'data', 'results', 'list', 'alerts', 'alertes'].map(k => brut[k]).find(Array.isArray) || Object.values(brut).find(v => Array.isArray(v) && v.length && typeof v[0] === 'object')) : null;
+          if (/^\s*(liste|list|montre|affiche|donne)\b/i.test(text) && Array.isArray(liste)) {
+            const champ = (o, ks) => { for (const k of ks) { const v = o?.[k]; if (v !== undefined && v !== null && v !== '' && typeof v !== 'object') return String(v); } return null; };
+            const lignes = liste.slice(0, 40).map(o => {
+              if (!o || typeof o !== 'object') return `- ${String(o).slice(0, 80)}`;
+              const nom = champ(o, ['name', 'nom', 'hostname', 'label', 'title', 'titre', 'host', 'id']) || '?';
+              const plus = [champ(o, ['ip', 'address', 'adresse', 'ipv4']), champ(o, ['vendor', 'fabricant', 'type', 'kind', 'category']), champ(o, ['status', 'etat', 'state', 'severity', 'level', 'niveau'])].filter(x => x && x !== nom);
+              return `- **${nom}**${plus.length ? ` — ${plus.join(' · ')}` : ''}`;
+            });
+            const reply = liste.length ? `**${i.name}** › ${choix.name || choix.id} : ${liste.length} élément${liste.length > 1 ? 's' : ''}${liste.length > 40 ? ' (les 40 premiers)' : ''}.\n${lignes.join('\n')}` : `**${i.name}** › ${choix.name || choix.id} : rien pour l’instant.`;
+            const plan = { reply, steps: [], suggestions: [], relances: [], model: 'Hub', connection: null, duree: Date.now() - debut };
+            const pid = id('p_');
+            this.db.run('INSERT INTO agent_plans(id,request,plan,status,created,compte) VALUES(?,?,?,?,?,?)', pid, String(affiche).slice(0, 4000), JSON.stringify(plan), 'answered', Date.now(), this.compteCourant);
+            return { id: pid, ...plan, status: 'answered' };
+          }
+        }
       }
     }
     const detailServices = ctx.instances.filter(i => nommes.has(i.id));

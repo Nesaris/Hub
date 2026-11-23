@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.20.2",
+    "date": "2026-11-23",
+    "points": [
+      "« Liste les appareils de MapMyLAN », « montre les alertes de VIGIE » : la liste arrive tout de suite, lue chez le service, sans passer par le modèle."
+    ]
+  },
+  {
     "version": "0.20.1",
     "date": "2026-11-23",
     "points": [
