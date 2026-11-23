@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.19.2",
+    "date": "2026-11-23",
+    "points": [
+      "Relier un bot depuis un téléphone : passer dans Telegram puis revenir ne coupe plus la liaison (« Load failed ») — le Hub reprend là où il en était."
+    ]
+  },
+  {
     "version": "0.19.1",
     "date": "2026-11-23",
     "points": [

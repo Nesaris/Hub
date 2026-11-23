@@ -2715,7 +2715,19 @@ function ficheSecret(d, { id, perso, existant }, apres) {
               if (!box.isConnected || !liaison) return;
               let r;
               try { r = await POST(`/api/secrets/telegram/liaison/${encodeURIComponent(liaison.id)}`, {}); }
-              catch (e) { const el = $('.tg-pas:not([hidden]) .tg-etat', box); if (el) etat(el, false, e.message); return; }
+              catch (e) {
+                // Le réseau a lâché : sur téléphone, ouvrir Telegram met la page en pause et coupe l'attente.
+                // Rien n'est perdu côté Hub : on reprend dès que la page revient.
+                if (!e.status) {
+                  await new Promise(ok => {
+                    if (!document.hidden) return setTimeout(ok, 1500);
+                    const revenir = () => { if (!document.hidden) { document.removeEventListener('visibilitychange', revenir); ok(); } };
+                    document.addEventListener('visibilitychange', revenir);
+                  });
+                  continue;
+                }
+                const el = $('.tg-pas:not([hidden]) .tg-etat', box); if (el) etat(el, false, e.message); return;
+              }
               if (r.etape === 'code' && $('[data-pas="3"]', box).hidden) {
                 $('#tgCode', box).textContent = r.code.replace(/(\d{3})(\d{3})/, '$1 $2');
                 $('#tgOu', box).textContent = r.chat.type === 'private' ? 'ta discussion avec le bot' : `le groupe « ${r.chat.nom} »`;
