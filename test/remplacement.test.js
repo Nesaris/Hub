@@ -19,7 +19,7 @@ const schema = JSON.parse(fs.readFileSync(new URL('../server/manifest/schema.jso
 const manifeste = (id, name, version, extra = {}) => ({
   manifestVersion: 1, id, name, version, description: 'd',
   install: { type: 'compose', compose: 'c.yml', healthcheck: { type: 'http', path: '/healthz' }, ports: [{ name: 'http', container: 8112, protocol: 'http', expose: 'proxy' }], volumes: [{ name: 'data', path: '/app/data' }] },
-  config: [{ key: 'SOCLE_CLE', label: 'Clé', type: 'secret' }, { key: 'SOCLE_JETON_INSTALLATION', label: 'Jeton', type: 'secret' }, { key: `${id.toUpperCase()}_DUELS_JOUR`, label: 'Duels', type: 'string' }],
+  config: [{ key: 'IMAGE_TAG', label: 'Image', type: 'string', default: version }, { key: 'SOCLE_CLE', label: 'Clé', type: 'secret' }, { key: 'SOCLE_JETON_INSTALLATION', label: 'Jeton', type: 'secret' }, { key: `${id.toUpperCase()}_DUELS_JOUR`, label: 'Duels', type: 'string' }],
   capabilities: { provides: [], requires: [] }, triggers: [], actions: [], probes: [], ...extra,
 });
 const ANCIEN = manifeste('oracle', 'Oracle AI', '2.1.0');
@@ -118,7 +118,7 @@ function banc({ echoue = false, volumeDeja = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'remplacement-'));
   const db = openDb(':memory:');
   const vault = Vault.depuisCle(Buffer.alloc(32, 7).toString('base64'));
-  const cfg = vault.sealFields({ SOCLE_CLE: 'cle-maitresse', ORACLE_DUELS_JOUR: '40' }, ['SOCLE_CLE']);
+  const cfg = vault.sealFields({ SOCLE_CLE: 'cle-maitresse', ORACLE_DUELS_JOUR: '40', IMAGE_TAG: '2.1.0' }, ['SOCLE_CLE']);
   db.run("INSERT INTO instances(id,ext_id,name,mode,url,stack,config,manifest,version,status,created) VALUES('i1','oracle','oracle','compose','http://hub-oracle:8112',4,?,?,'2.1.0','online',1)", JSON.stringify(cfg), JSON.stringify(ANCIEN));
   fs.mkdirSync(path.join(dir, 'oracle'));
   fs.writeFileSync(path.join(dir, 'oracle', 'compose.yml'), 'ancien');
@@ -168,6 +168,7 @@ test('remplacement : le service garde ses données, ses réglages et ses routes 
     assert.deepEqual([i.id, i.name, i.ext_id, i.url, i.stack], ['i1', 'dialekt', 'dialekt', 'http://hub-dialekt:8112', 4], 'même instance : workflows et comptes la retrouvent');
     const cfg = b.s.configOf(i);
     assert.deepEqual([cfg.SOCLE_CLE, cfg.DIALEKT_DUELS_JOUR, 'ORACLE_DUELS_JOUR' in cfg], ['cle-maitresse', '40', false], 'la clé maîtresse suit : les données restent lisibles');
+    assert.equal(cfg.IMAGE_TAG, '2.2.1', 'l’étiquette d’image de l’ancienne extension ne suit pas : celle du nouveau manifeste');
     assert.ok(!fs.existsSync(path.join(b.dir, 'oracle')), 'l’ancienne pile est retirée');
     assert.match(b.etapes.join('\n'), /Oracle AI 2\.1\.0 → DIALEKT 2\.2\.1 : oracle devient dialekt/);
     assert.match(b.etapes.join('\n'), /Ancien volume gardé : hub-oracle-data/);

@@ -761,8 +761,13 @@ export class Services {
       cfg[vers] = cfg[de];
       delete cfg[de];
     }
+    /* L'étiquette d'image de l'ancienne extension ne veut rien dire pour la
+       nouvelle (DIALEKT 2.6.0 → MuxAI : l'image muxai:2.6.0 n'existe pas) :
+       on repart du défaut du nouveau manifeste, sans épinglage. */
+    const imageNeuve = (m.config || []).find(f => f.key === CLE_IMAGE)?.default;
+    if (imageNeuve !== undefined) cfg[CLE_IMAGE] = imageNeuve; else delete cfg[CLE_IMAGE];
     const ligne = this.db.get('SELECT * FROM instances WHERE id=?', inst.id);
-    const ecrire = () => this.db.run('UPDATE instances SET ext_id=?, name=?, manifest=?, config=?, url=? WHERE id=?', m.id, nom, JSON.stringify(m),
+    const ecrire = () => this.db.run('UPDATE instances SET ext_id=?, name=?, manifest=?, config=?, url=?, image_epinglee=0 WHERE id=?', m.id, nom, JSON.stringify(m),
       JSON.stringify(this.vault.sealFields(cfg, secretKeysOf(m))), inst.mode === 'compose' ? adresseInterne(nom, m) : inst.url, inst.id);
     const trace = { de: `${inst.ext_id} ${inst.version}`, vers: `${m.id} ${m.version}`, ...(nom !== ancienNom ? { nom } : {}) };
     const annonce = `${avant.name} ${inst.version} → ${m.name} ${m.version}${nom !== ancienNom ? ` : ${ancienNom} devient ${nom}` : ''}`;

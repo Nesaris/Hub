@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.21.1",
+    "date": "2026-11-23",
+    "points": [
+      "Remplacement d’une extension par une autre (DIALEKT → MuxAI) : la nouvelle repart de sa propre version d’image, au lieu de reprendre celle de l’ancienne."
+    ]
+  },
+  {
     "version": "0.21.0",
     "date": "2026-11-23",
     "points": [
