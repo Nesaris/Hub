@@ -965,8 +965,25 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     const aVoixHaute = voix ? '\n\n(Réponse LUE À VOIX HAUTE : "reply" fait une à trois phrases parlées, naturelles, sans liste, sans markdown, sans emoji. Les chiffres détaillés passent par les widgets, choisis-les librement si la question porte sur des données.)' : '';
     // Le détail complet des services que la demande nomme (au plus trois).
     const nommes = new Set(this.servicesCites(text).slice(0, 3).map(i => i.id));
+    /* « Liste les appareils de MapMyLAN », « quelles alertes a remontées
+       VIGIE ? » : une question qui se lit chez UN service. On lit avant de
+       demander au modèle — un petit modèle écrivait un « plan » en prose au
+       lieu de lire, et répondait sans données. */
+    let luAvant = null;
+    if (!direct && nommes.size === 1 && /^\s*(liste|list|montre|affiche|donne|quel(le)?s?|combien|qu['’]?est[- ]ce qu|y a[- ]t[- ]il|est[- ]ce qu|r[ée]sume|r[ée]sum[ée])\b|\?\s*$/i.test(text) && !/\b(cr[ée]e|ajoute|supprim|install|branche|connecte|active|d[ée]sactive|modifie|r[ée]pare|corrige)\w*/i.test(text)) {
+      const i = this.services.get([...nommes][0]);
+      const mots = new Set(String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(m => m.length >= 4));
+      const score = a => String(`${a.id} ${a.name || ''} ${a.description || ''}`).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(m => m.length >= 4 && [...mots].some(w => m.startsWith(w.slice(0, 5)) || w.startsWith(m.slice(0, 5)))).length;
+      const lectures = (i.manifest.actions || []).filter(a => a.risk === 'read' && !(a.params || []).some(p => p.required)).map(a => ({ a, n: score(a) })).sort((x, y) => y.n - x.n);
+      const choix = lectures[0]?.n ? lectures[0].a : lectures.find(x => /(^|\.)(state|etat|status|summary|resume)$/i.test(x.a.id))?.a;
+      if (choix) {
+        if (this.courant) Object.assign(this.courant, { texte: `Je regarde : ${i.name} › ${choix.name || choix.id}…`, phase: 'lecture' });
+        this.signaler('agent.token', { text: `Je regarde : ${i.name} › ${choix.name || choix.id}…`, etapes: -1 });
+        luAvant = (await this.lire([{ quoi: 'action', instance: i.name, action: choix.id, params: {} }]))[0];
+      }
+    }
     const detailServices = ctx.instances.filter(i => nommes.has(i.id));
-    const content = `<donnees>\n${JSON.stringify({ mémoire: brief.souvenirs, profil: brief.profil, corrections_passées: brief.corrections, ...(brief.cerveaux?.length ? { autres_cerveaux: brief.cerveaux } : {}), ...(detailServices.length ? { services_nommes_en_detail: detailServices } : {}), ...enCours, ...attente })}\n</donnees>\n\nDemande : ${text}${aVoixHaute}`;
+    const content = `<donnees>\n${JSON.stringify({ mémoire: brief.souvenirs, profil: brief.profil, corrections_passées: brief.corrections, ...(brief.cerveaux?.length ? { autres_cerveaux: brief.cerveaux } : {}), ...(detailServices.length ? { services_nommes_en_detail: detailServices } : {}), ...(luAvant ? { deja_lu_pour_toi: luAvant } : {}), ...enCours, ...attente })}\n</donnees>\n\nDemande : ${text}${luAvant ? '\n\n(Ce que la demande vise est déjà lu, dans "deja_lu_pour_toi" : réponds avec ces données, en clair — pas de plan, pas de « je vais lire ».)' : ''}${aVoixHaute}`;
     // L'assistant répond en JSON — un plan, pas une prose. On ne peut donc pas
     // afficher les jetons bruts : ce serait des accolades. Mais la clé `reply`
     // est écrite en premier, et c'est elle que l'on veut voir se former. On
@@ -1245,6 +1262,11 @@ ${JSON.stringify(this.donneesConversation(ctx))}
       .map(w => construireWidget(w, this)).filter(Boolean)
       .slice(0, /tableau de bord|dashboard|tout voir|vue d.ensemble/i.test(q) ? 3 : 2);
     const choixOuvert = final.choix || (!steps.length && enAttente && !retenu.length ? enAttente.choix : null);
+    // Un nouveau workflow demandé : jamais un envoi greffé sur les workflows existants à la place.
+    if (/\b(cr[ée]e|cr[ée]er|fais|fabrique|monte|ajoute)\w*\b.{0,20}\b(un|nouveau)\b.{0,15}\bworkflow/i.test(text) && steps.some(st => st.tool === 'ajouter_envoi')) {
+      steps = steps.filter(st => st.tool !== 'ajouter_envoi');
+      if (!steps.length) final.reply = `${String(final.reply || '').replace(/Aucune action proposée : rien n'a été fait\.?\s*/i, '')}\n\nJe n’ai pas réussi à construire ce nouveau workflow d’un coup. Redemande-le en une phrase plus précise (déclencheur, ce qu’il lit, où il envoie), ou crée-le dans Workflows → Nouveau.`.trim();
+    }
     const plan = { duree: Date.now() - debut, reply: dedoublonne(String(final.reply || '')), steps, suggestions: this.suggestions(final.suggestions, ctx),
       relances: choixOuvert ? choixOuvert.map(c => `Sur le compte « ${c.canal} »`).slice(0, 3) : nettoieRelances(final.relances), model: r.model, connection: r.connection,
       ...(choixOuvert ? { choix: choixOuvert } : {}), ...(widgets.length ? { widgets } : {}) };
@@ -1632,6 +1654,11 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     if (t.length <= 200 && !/\?\s*$/.test(t) && (/(expos|mets?\b|met\b|publi|ouvr|rend)\w*.{0,50}(internet|en ligne|partout|public|l['’]ext[ée]rieur|dehors|n['’]importe o[uù]|cloudflare|tunnel)/i.test(t) || /(accessible|joignable)\w*.{0,30}(de partout|partout|internet|l['’]ext[ée]rieur)/i.test(t)) && !/workflow/i.test(t)) return { exposer: true };
     // « Lance les mises à jour dispo », « y a des mises à jour ? » : le catalogue répond, pas le modèle.
     if (t.length <= 160 && /mises? [àa] jour|\bmets? [àa] jour|\bmaj\b|\bupdates?\b|\bactualise/i.test(t) && !/workflow|surveill|notif|pr[ée]vien|alerte|pourquoi|[ée]chou|erreur|catalogue/i.test(t)) return { majs: true, cibles: this.servicesCites(t).map(i => i.id) };
+    // « Redémarre MapMyLAN » : l'étape tout de suite (le modèle annonçait le redémarrage sans rien proposer).
+    if (t.length <= 80 && /^\s*(red[ée]marr|relanc|reboot|restart)\w*\b/i.test(t) && !/workflow|conversation|[ée]coute|bot|telegram/i.test(t)) {
+      const c = this.servicesCites(t);
+      if (c.length === 1) return { steps: [{ tool: 'hub', args: { action: `POST /api/instances/${c[0].id}/redeploy`, titre: `Redémarrer ${c[0].name}` } }], reply: `Je redémarre **${c[0].name}** (ses réglages et ses données restent). Il sera indisponible quelques secondes.` };
+    }
     // « Qu'est-ce qui est hors ligne ? » : l'état des services, tout de suite.
     if (t.length <= 90 && /hors[- ]ligne|en panne|\bdown\b|plant[ée]|ne r[ée]pond|marche pas|injoignable|est[- ]ce que tout (marche|tourne|va)/i.test(t) && !/pourquoi|r[ée]pare|corrige|relance|red[ée]marr/i.test(t)) return { donnees: [{ type: 'services' }] };
     if (t.length > 160 || t.startsWith('📩')) return null;

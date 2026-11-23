@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.20.1",
+    "date": "2026-11-23",
+    "points": [
+      "« Redémarre <service> » propose l’étape tout de suite ; une question sur un service (« liste les appareils de MapMyLAN », « quelles alertes a remontées VIGIE ? ») est lue avant de répondre, et la réponse donne les données.",
+      "« Crée un workflow… » ne greffe plus d’envoi sur tes workflows existants à la place."
+    ]
+  },
+  {
     "version": "0.20.0",
     "date": "2026-11-23",
     "points": [
