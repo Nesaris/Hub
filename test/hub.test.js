@@ -1506,6 +1506,11 @@ test('réponses instantanées : l’état des services et un bonjour ne passent 
   const s = await api('POST', '/api/agent/ask', { text: 'salut sa va ?' });
   assert.match(s.reply, /^Salut ! Ça va/);
   assert.equal(s.widgets, undefined);
+  // « Salut » seul : on ne répond pas à une question qui n'a pas été posée.
+  const s2 = await api('POST', '/api/agent/ask', { text: 'Salut' });
+  assert.match(s2.reply, /^Salut ! (Au passage|Tout tourne)/);
+  assert.doesNotMatch(s2.reply, /Ça va/);
+  assert.match((await api('POST', '/api/agent/ask', { text: 'bonsoir' })).reply, /^Bonsoir !/);
   assert.equal(fake.state.chats.slice(avant).filter(x => x.messages[0]?.content?.includes('assistant de configuration')).length, 0, 'aucun appel au modèle');
 });
 

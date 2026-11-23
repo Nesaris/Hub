@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.19.3",
+    "date": "2026-11-23",
+    "points": [
+      "L’assistant répond à ce qu’on lui dit : « Salut » reçoit un salut, pas un « Ça va, merci » à une question jamais posée."
+    ]
+  },
+  {
     "version": "0.19.2",
     "date": "2026-11-23",
     "points": [

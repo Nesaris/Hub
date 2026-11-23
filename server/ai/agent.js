@@ -917,7 +917,14 @@ ${JSON.stringify(this.donneesConversation(ctx))}
         const r = this.resume(ctx);
         const souci = [r.workflows.en_echec.length ? `${r.workflows.en_echec.length} workflow${r.workflows.en_echec.length > 1 ? 's' : ''} en échec (${r.workflows.en_echec.join(', ')})` : '',
           ctx.instances.filter(i => i.status !== 'online').map(i => `${i.name} ${i.status}`).join(', ')].filter(Boolean);
-        reply = `Salut ! Ça va, merci. ${souci.length ? `Au passage : ${souci.join(' · ')}.` : 'Tout tourne normalement de mon côté.'} Qu’est-ce que je fais pour toi ?`;
+        // On répond à ce qui a été dit : « ça va » seulement si on nous l'a demandé.
+        const t = String(affiche || text || "").toLowerCase();
+        const demande = /\b([çcs]a va|tu vas bien|comment (tu vas|vas[- ]tu|[çc]a va)|la forme)\b/.test(t);
+        const merci = /\bmerci\b/.test(t);
+        const accord = !merci && /^\s*(ok|okay|d'?accord|super|cool|top|parfait|nickel)\b/.test(t);
+        const mot = /\bbonsoir\b/.test(t) ? 'Bonsoir' : /\bbonjour\b/.test(t) ? 'Bonjour' : 'Salut';
+        const tete = merci ? 'Avec plaisir !' : accord ? 'Parfait.' : `${mot} !${demande ? ' Ça va, merci.' : ''}`;
+        reply = `${tete} ${souci.length ? `Au passage : ${souci.join(' · ')}.` : 'Tout tourne normalement de mon côté.'} Qu’est-ce que je fais pour toi ?`;
       } else reply = tous.map(widgetEnPhrase).filter(Boolean).join('\n\n');
       const plan = { reply, steps: [], suggestions: [], relances: [], model: 'Hub', connection: null, duree: Date.now() - debut, ...(widgets.length ? { widgets } : {}) };
       const pid = id('p_');
