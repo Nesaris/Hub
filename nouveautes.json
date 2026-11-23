@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.18.1",
+    "date": "2026-11-23",
+    "points": [
+      "Extensions : le dépôt du Hub lui-même n’est plus proposé à « Rendre compatible ».",
+      "install.sh lancé par « curl … | bash » ne signale plus d’erreur au démarrage."
+    ]
+  },
+  {
     "version": "0.18.0",
     "date": "2026-11-22",
     "points": [

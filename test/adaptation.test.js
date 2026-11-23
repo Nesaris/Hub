@@ -109,6 +109,8 @@ function monde({ licence = 'MIT', texte = 'MIT License\nPermission is hereby gra
   const depots = [
     { full_name: 'acme/outil', default_branch: 'main', pushed_at: '2026-11-12T09:05:07Z', description: 'Un outil', stargazers_count: 12, license: { spdx_id: licence } },
     { full_name: 'acme/sans-licence', default_branch: 'main', pushed_at: '2026-11-01T00:00:00Z', license: null },
+    // Le dépôt du Hub lui-même : jamais une extension à adapter.
+    { full_name: 'Nesaris/Hub', default_branch: 'main', pushed_at: '2026-11-22T00:00:00Z', description: 'Le Hub', license: { spdx_id: 'MIT' } },
   ];
   configurerSortie({ transport: async url => {
     const u = String(url).split('?')[0];
@@ -144,6 +146,7 @@ test('adaptation : licence lue, description de l’IA, extension au catalogue ma
     assert.equal(d.licenceOk, true);
     assert.equal(d.sha, SHA);
     assert.equal(adaptation.ligne('acme/sans-licence').licenceOk, false);
+    assert.equal(adaptation.ligne('Nesaris/Hub'), null, 'le Hub ne se propose pas à lui-même');
     await adaptation.lancer('acme/outil', 'ana');
     const apres = adaptation.ligne('acme/outil');
     assert.equal(apres.etat, 'adapte', apres.raison);

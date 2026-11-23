@@ -211,6 +211,9 @@ Lis les fichiers fournis et décris l'application. Réponds en JSON strict, rien
  "variables": [{"cle": "NOM_DE_VARIABLE", "libelle": "en français", "type": "string|secret|number|boolean", "defaut": "valeur ou null", "requis": true|false, "genere": true si c'est un secret aléatoire que l'application accepte, "aide": "une phrase"}]}
 Ne mets que les variables d'environnement que l'application lit vraiment, les volumes où elle garde des données. N'invente rien : en cas de doute, laisse vide.`;
 
+// Le dépôt d'où vient le Hub (install.sh, HUB_REPO).
+const DEPOT_HUB = (/github\.com\/([^/\s]+\/[^/\s#?]+?)(?:\.git)?\/?$/i.exec(process.env.HUB_REPO || '') || [, 'Nesaris/Hub'])[1].toLowerCase();
+
 export class Adaptation {
   constructor({ db, audit, bus, registry, ai, sortie = sortir }) {
     Object.assign(this, { db, audit, bus, registry, ai, sortie });
@@ -219,6 +222,8 @@ export class Adaptation {
 
   /** Un dépôt sans hub.json vu par l'actualisation : noté, ou mis à jour. */
   noter(source, r, sha) {
+    // Le dépôt du Hub lui-même n'est pas une extension : jamais proposé à l'adaptation.
+    if (String(r.full_name || '').toLowerCase() === DEPOT_HUB) { this.oublier(r.full_name); return null; }
     const t = Date.now();
     this.db.run(`INSERT INTO depots_ia(repo, source, ref, sha, pousse, description, etoiles, licence, maj) VALUES(?,?,?,?,?,?,?,?,?)
       ON CONFLICT(repo) DO UPDATE SET source=excluded.source, ref=excluded.ref, sha=excluded.sha, pousse=excluded.pousse, description=excluded.description, etoiles=excluded.etoiles, licence=excluded.licence, maj=excluded.maj`,

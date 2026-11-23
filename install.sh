@@ -9,7 +9,8 @@ set -euo pipefail
 HUB_DIR="${HUB_DIR:-/opt/hub}"
 HUB_REPO="${HUB_REPO:-https://github.com/Nesaris/Hub}"
 HUB_REF="${HUB_REF:-main}"
-SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Lancé par « curl … | bash », il n'y a pas de fichier : les sources se téléchargent.
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-/nonexistent/x}")" 2>/dev/null && pwd || echo /nonexistent)"
 
 say()  { printf '\033[1m→\033[0m %s\n' "$*"; }
 ok()   { printf '\033[32m✓\033[0m %s\n' "$*"; }
