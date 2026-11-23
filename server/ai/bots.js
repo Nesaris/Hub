@@ -59,7 +59,7 @@ export class BotsIA {
   /** Les comptes Telegram de Clés & API : un bot chacun. */
   comptesTelegram() {
     return (this.agent.canaux() || []).filter(c => c.noeud?.type === 'out.telegram')
-      .map(c => ({ service: c.service, canal: c.canal, pret: c.pret, ...(c.manque ? { manque: c.manque } : {}) }));
+      .map(c => ({ service: c.service, canal: c.canal, pret: c.pret, relie: this.liaison ? this.liaison.estVerifie(c.service) : true, ...(c.manque ? { manque: c.manque } : {}) }));
   }
 
   administrateurs() {
@@ -83,7 +83,7 @@ export class BotsIA {
         let jeton = null;
         try { jeton = this.identifiants(b).token; } catch { /* compte incomplet */ }
         const l = jeton ? this.lecteurs.get(jeton) : null;
-        return { ...b, canal: this.comptesTelegram().find(c => c.service === b.service)?.canal || b.service,
+        return { ...b, canal: this.comptesTelegram().find(c => c.service === b.service)?.canal || b.service, relie: this.liaison ? this.liaison.estVerifie(b.service) : true,
           lecture: !!l?.etat.lecture, erreur: l?.etat.erreur || (b.actif && !jeton ? 'compte Telegram incomplet dans Clés & API' : null),
           nom: jeton ? this.noms.get(jeton) || null : null };
       }),
@@ -105,7 +105,13 @@ export class BotsIA {
       const utilisateurs = [...new Set((Array.isArray(b?.utilisateurs) ? b.utilisateurs : String(b?.utilisateurs || '').split(/[\s,;]+/))
         .map(x => String(x).trim()).filter(Boolean))];
       if (utilisateurs.length > 20 || utilisateurs.some(u => !/^\d{1,15}$/.test(u))) throw new HttpError(400, 'Utilisateurs autorisés : des identifiants Telegram (chiffres), 20 au plus.');
-      return { id: /^b_[\w-]{4,20}$/.test(b?.id || '') ? b.id : nouvelId('b_'), service, lie, utilisateurs, actif: b?.actif !== false };
+      const actif = b?.actif !== false;
+      // Un bot ne s'active qu'une fois relié : jeton vérifié et discussion prouvée par un code.
+      if (actif && this.liaison && !this.liaison.estVerifie(service)) {
+        const nom = this.comptesTelegram().find(c => c.service === service)?.canal || service;
+        throw new HttpError(400, `${nom} n’est pas encore relié : Clés & API → ce compte → « Relier le bot » (tu envoies un code au bot, et c’est fait).`);
+      }
+      return { id: /^b_[\w-]{4,20}$/.test(b?.id || '') ? b.id : nouvelId('b_'), service, lie, utilisateurs, actif };
     });
     let compte = corps?.compte ? String(corps.compte) : null;
     if (compte && !this.administrateurs().some(a => a.id === compte)) throw new HttpError(400, 'Le compte du Hub choisi n’est pas un administrateur.');

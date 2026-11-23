@@ -126,7 +126,10 @@ export const SCHEMAS = {
   'POST /api/secrets/test': { corps: { service: REQ(TXT(100)), message: TXT(1000) } },
   'POST /api/secrets/telegram/chats': { corps: { service: TXT(100), token: TXT(200) } },
   'POST /api/secrets/elevenlabs/voix': { corps: { service: TXT(100), token: TXT(500) } },
-  'POST /api/secrets': { corps: { service: TXT(100), nom: TXT(60), compte: TXT(40), site: TXT(300), champs: JSONV(1) } },
+  'POST /api/secrets': { corps: { service: TXT(100), nom: TXT(60), compte: TXT(40), site: TXT(300), champs: JSONV(1), preuve: TXT(40) } },
+  'POST /api/secrets/telegram/verifier': { corps: { service: TXT(100), token: TXT(200) } },
+  'POST /api/secrets/telegram/liaison': { corps: { service: TXT(100), token: TXT(200) } },
+  'POST /api/secrets/telegram/liaison/:id': { corps: VIDE },
   'DELETE /api/secrets/:service': { corps: VIDE },
   // ?d= : le domaine, qui change l'adresse de l'image quand le site d'une clé change.
   'GET /api/secrets/logo/:id': { requete: { d: TXT(253) } },

@@ -17,6 +17,7 @@ const SURES = new Set(['GET', 'HEAD']);
 /* Jamais par l'assistant, même validé par un clic : la raison est dite telle quelle. */
 const INTERDITS = [
   [/^\w+ \/api\/accounts\b/, 'Les comptes des services (identifiants, mots de passe, liens de réinitialisation, double facteur) restent entre tes mains : Comptes services.'],
+  [/^POST \/api\/secrets\/telegram\//, 'Relier un bot Telegram se fait à la main, dans Clés & API : c’est toi qui envoies le code au bot.'],
   [/^(POST|PUT|PATCH|DELETE) \/api\/secrets(\/(?!test$)[^/]+)?$/, 'Une clé ou un jeton se colle à la main dans Clés & API : je n’en vois ni n’en écris jamais la valeur.'],
   [/^\w+ \/api\/ai\/outils\/\w+\/connexion/, 'Connecter un compte Claude Code ou Codex est un geste de l’utilisateur, page IA : il ouvre le lien et colle le code lui-même.'],
   [/^GET \/api\/secrets\/valeur\//, 'La valeur d’une clé ne se dévoile qu’à une personne, dans Clés & API, après sa vérification : je ne la vois jamais.'],

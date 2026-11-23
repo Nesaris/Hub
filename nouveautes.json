@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.19.0",
+    "date": "2026-11-23",
+    "points": [
+      "Clés & API → Telegram, pas à pas : colle le jeton, il est vérifié tout de suite (nom du bot affiché). Puis « Relier le bot » : un bouton ouvre le bot dans Telegram avec un code, tu appuies sur Démarrer, et la discussion se relie toute seule.",
+      "Un bot ne s’active pour l’assistant qu’une fois relié ainsi ; changer son jeton demande de le relier à nouveau."
+    ]
+  },
+  {
     "version": "0.18.2",
     "date": "2026-11-23",
     "points": [

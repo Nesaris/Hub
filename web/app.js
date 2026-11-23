@@ -2607,10 +2607,12 @@ function ficheSecret(d, { id, perso, existant }, apres) {
       ? html`<div class="formgrid"><div class="fl"><label for="sk${i}">Nom du champ</label><input class="field mono" id="sk${i}" data-k=${i} value=${f.key} placeholder="API_KEY"></div>
          <div class="fl"><label for="sv${i}">Valeur${existant?.champs[i]?.rempli && existant.champs[i].secret ? html` <span class="devoiler-ici" data-cle=${existant.champs[i].key}></span>` : ''}</label><input class="field mono" id="sv${i}" type="password" data-f=${i} autocomplete="new-password" placeholder=${existant ? 'vide = inchangé' : ''}></div></div>`
       : html`<div class="fl"><label for="sv${i}">${I(f.secret ? 'key' : 'text', 12)} ${f.label} <span class="mono mini" data-prefixe=${f.key}>${c.id.toUpperCase()}_${f.key}</span>${deja?.champs.some(k => k.key.endsWith('_' + f.key) && k.rempli) ? html` <span class="chip a">enregistré</span>${f.secret ? html` <span class="devoiler-ici" data-cle=${deja.champs.find(k => k.key.endsWith('_' + f.key)).key}></span>` : ''}` : ''}</label>
-         <input class="field mono" id="sv${i}" data-f=${f.key} type=${f.secret ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.secret && deja ? 'vide = inchangé' : ''}>
+         <input class="field mono" id="sv${i}" data-f=${f.key} type=${f.secret ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.secret && deja ? 'vide = inchangé' : c.id === 'telegram' && f.key === 'CHAT_ID' ? 'rempli à l’étape 2' : ''} readonly=${c.id === 'telegram' && f.key === 'CHAT_ID'}>
          ${f.help ? html`<div class="help">${f.help}</div>` : ''}
          ${c.id === 'elevenlabs' && f.key === 'VOICE_ID' ? html`<div class="row avec-marge"><button class="btn sm" id="elVoix" type="button">${I('mic', 13)}Choisir une voix</button><span class="mini" id="elMsg">Liste les voix de ton compte (la clé est vérifiée au passage).</span></div><div id="elOut"></div>` : ''}
-         ${c.id === 'telegram' && f.key === 'CHAT_ID' ? html`<div class="row avec-marge"><button class="btn sm" id="tgChats" type="button">${I('search', 13)}Trouver l’identifiant</button><span class="mini" id="tgOut">Écris d’abord /start à ton bot dans Telegram (ou ajoute-le au groupe).</span></div>` : ''}</div>`)}</div>
+         ${c.id === 'telegram' && f.key === 'BOT_TOKEN' ? html`<div class="tg-etape" id="tgJeton"><span class="tg-num">1</span><span class="mini">${deja ? 'Jeton enregistré : colle un nouveau jeton pour changer de bot, ou relie directement.' : 'Colle le jeton : il est vérifié tout de suite.'}</span></div>` : ''}
+         ${c.id === 'telegram' && f.key === 'CHAT_ID' ? html`<div class="tg-etape" id="tgLien"><span class="tg-num">2</span><div class="grow"><button class="btn sm solid" id="tgRelier" type="button" disabled=${!deja}>${I('send', 13)}Relier le bot</button>
+           <div class="mini" id="tgOut">Le Hub te donne un code : tu l’envoies au bot dans Telegram (un seul bouton), et la discussion se relie toute seule.</div></div></div>` : ''}</div>`)}</div>
     ${perso ? html`<button class="btn sm" id="secPlus">${I('plus', 13)}Ajouter un champ</button>` : ''}
     <div id="secErr"></div>`;
   const valeurDe = (box, cle) => [...box.querySelectorAll('[data-f]')].find(x => x.dataset.f === cle);
@@ -2626,11 +2628,13 @@ function ficheSecret(d, { id, perso, existant }, apres) {
       });
       const compte = $('#secCompte', box)?.value.trim() || '';
       if (nouveauCompte && aDefaut && !compte) { poser($('#secErr', box), html`<div class="err">Un ${c.nom} est déjà enregistré : donne un nom à celui-ci.</div>`); return false; }
+      if (c?.id === 'telegram' && (!existant || valeurs.BOT_TOKEN) && !box.dataset.preuve) { poser($('#secErr', box), html`<div class="err">Relie d’abord le bot (étape 2) : sans ça, il ne s’active pas.</div>`); return false; }
       const req = perso ? { nom: $('#secNom', box).value.trim(), champs: valeurs, site: $('#secSite', box).value.trim() }
         : existant ? { service: existant.service, champs: valeurs } : { service: c.id, compte, champs: valeurs };
+      if (box.dataset.preuve) req.preuve = box.dataset.preuve;
       try {
         const r = await POST('/api/secrets', req);
-        toast(r.clés.length ? `${r.clés.length} clé(s) enregistrée(s)` : 'Enregistré');
+        toast(r.relie ? 'Bot relié et enregistré ✓' : r.clés.length ? `${r.clés.length} clé(s) enregistrée(s)` : 'Enregistré');
         Object.assign(d, await GET('/api/secrets')); apres();
       } catch (e) { poser($('#secErr', box), html`<div class="err">${e.message}</div>`); return false; }
     } }],
@@ -2647,20 +2651,52 @@ function ficheSecret(d, { id, perso, existant }, apres) {
         };
         if (cpt && c) { cpt.oninput = majPrefixe; majPrefixe(); }
         // Telegram : l'identifiant de discussion se lit dans les messages reçus par le bot.
-        const tg = $('#tgChats', box);
-        if (tg) tg.onclick = () => pulse(tg, async () => {
-          const r = await POST('/api/secrets/telegram/chats', { service: existant?.service || c.id, token: valeurDe(box, 'BOT_TOKEN')?.value || '' });
-          const out = $('#tgOut', box);
-          if (!r.chats.length) {
-            out.textContent = [r.bot ? `Ce jeton est celui de ${r.bot} : c’est à lui qu’il faut écrire /start dans Telegram, puis réessayer.` : 'Aucun message reçu par le bot : écris-lui /start dans Telegram, puis réessaie.',
-              r.webhook ? 'Ce bot envoie ses messages à une adresse web (webhook) : un autre programme le lit, le Hub ne voit rien passer.' : '',
-              r.deja?.length ? `Ce jeton est déjà enregistré ici (${r.deja.join(', ')}) : ce qui le lit prend les messages avant toi. Reprends l’identifiant de discussion de ce compte-là.` : ''].filter(Boolean).join(' ');
-            return;
-          }
-          poser(out, r.chats.map(ch => [html`<button class="chip a" type="button" data-chat=${ch.id} title=${ch.type}>${ch.nom} · ${ch.id}</button>`, ' ']));
-          $$('[data-chat]', out).forEach(b => { b.onclick = () => { valeurDe(box, 'CHAT_ID').value = b.dataset.chat; toast(`Identifiant ${b.dataset.chat} repris`); }; });
-          if (r.chats.length === 1) { valeurDe(box, 'CHAT_ID').value = r.chats[0].id; toast('Identifiant rempli'); }
-        }).catch(e => { $('#tgOut', box).textContent = e.message; });
+        // Telegram pas à pas : 1. le jeton se vérifie seul ; 2. un code envoyé au bot relie la discussion.
+        const tgJ = $('#tgJeton', box), tgR = $('#tgRelier', box), tgO = $('#tgOut', box);
+        if (tgJ && tgR) {
+          const jeton = valeurDe(box, 'BOT_TOKEN'), chat = valeurDe(box, 'CHAT_ID');
+          const service = existant?.service || c.id;
+          const etat = (el, ok, texte) => { el.classList.toggle('ok', ok === true); el.classList.toggle('ko', ok === false); $('.mini', el).textContent = texte; };
+          let minuteur = null, tour = 0;
+          const verifier = async () => {
+            const t = jeton.value.replace(/\s+/g, '');
+            delete box.dataset.preuve; chat.value = chat.value && !t ? chat.value : '';
+            if (!t) { tgR.disabled = !existant; return; }
+            if (!/^\d+:[\w-]{20,}$/.test(t)) { etat(tgJ, false, 'Ce n’est pas un jeton de bot : il ressemble à 123456789:AAE…'); tgR.disabled = true; return; }
+            const n = ++tour;
+            etat(tgJ, null, 'Vérification auprès de Telegram…');
+            try {
+              const v = await POST('/api/secrets/telegram/verifier', { service, token: t });
+              if (n !== tour) return;
+              etat(tgJ, true, `✓ Jeton valide : ${v.bot} (${v.nom})${v.deja.length ? ` — déjà enregistré ici (${v.deja.join(', ')})` : ''}${v.webhook ? ' — attention : un webhook le lit ailleurs' : ''}`);
+              tgR.disabled = false;
+            } catch (e) { if (n === tour) { etat(tgJ, false, e.message); tgR.disabled = true; } }
+          };
+          jeton.oninput = () => { clearTimeout(minuteur); minuteur = setTimeout(verifier, 500); };
+          jeton.onpaste = () => { clearTimeout(minuteur); minuteur = setTimeout(verifier, 50); };
+          tgR.onclick = async () => {
+            tgR.disabled = true;
+            try {
+              const l = await POST('/api/secrets/telegram/liaison', { service, token: jeton.value.replace(/\s+/g, '') });
+              poser(tgO, html`<div class="tg-code"><a class="btn sm solid" href=${l.lien} target="_blank" rel="noopener">${I('send', 13)}Ouvrir ${l.bot} et appuyer sur Démarrer</a>
+                <span class="mini">ou envoie-lui ce message : <b class="mono">/start ${l.code}</b> · dans un groupe, ajoute d’abord le bot puis envoie le code</span>
+                <span class="mini" id="tgAttente">En attente du code…</span></div>`);
+              for (;;) {
+                if (!box.isConnected) return;
+                let r;
+                try { r = await POST(`/api/secrets/telegram/liaison/${encodeURIComponent(l.id)}`, {}); }
+                catch (e) { poser(tgO, html`<span class="err">${e.message}</span>`); tgR.disabled = false; return; }
+                if (r.ok) {
+                  chat.value = r.chat.id; box.dataset.preuve = l.id;
+                  $('#tgLien', box).classList.add('ok');
+                  poser(tgO, html`<span class="mini">✓ Relié à ${r.chat.type === 'private' ? 'ta discussion avec le bot' : `« ${r.chat.nom} »`} (${r.chat.id}). Enregistre pour terminer.</span>`);
+                  toast('Bot relié ✓');
+                  return;
+                }
+              }
+            } catch (e) { poser(tgO, html`<span class="err">${e.message}</span>`); tgR.disabled = false; }
+          };
+        }
         // ElevenLabs : l'identifiant de voix se choisit dans la liste du compte.
         const el = $('#elVoix', box);
         if (el) el.onclick = () => pulse(el, async () => {

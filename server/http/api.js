@@ -642,8 +642,21 @@ export function registerRoutes(routeur, h) {
     ctx.res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': son.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
     ctx.res.end(son);
   }, { role: 'admin', stream: true });
+  // Telegram pas à pas : jeton vérifié, puis la discussion prouvée par un code envoyé au bot.
+  const jetonDe = ctx => {
+    const t = String(ctx.body?.token || '').trim();
+    if (t) return t;
+    const svc = String(ctx.body?.service || '');
+    const k = secrets.list().find(x => x.service === svc)?.champs.find(c => c.key.endsWith('_BOT_TOKEN') && c.rempli)?.key;
+    return k ? secrets.valeur(k) || '' : '';
+  };
+  r.post('/api/secrets/telegram/verifier', ctx => h.liaison.verifier(jetonDe(ctx), String(ctx.body?.service || '')), { role: 'admin' });
+  r.post('/api/secrets/telegram/liaison', ctx => h.liaison.commencer(jetonDe(ctx), String(ctx.body?.service || '')), { role: 'admin' });
+  r.post('/api/secrets/telegram/liaison/:id', ctx => h.liaison.attendre(ctx.params.id), { role: 'admin' });
   r.post('/api/secrets', ctx => {
-    const out = secrets.poser(ctx.body, ctx.user);
+    const { preuve, ...corps } = ctx.body || {};
+    const out = secrets.poser(corps, ctx.user);
+    if (preuve) out.relie = h.liaison.confirmer(preuve, out.service, ctx.user);
     // Site changé : l'ancien logo ne correspond plus, on le retélécharge.
     if (ctx.body?.site !== undefined && !SECRETS_CATALOGUE.some(c => c.id === out.service)) logos?.oublier(out.service);
     // Une clé de voix posée : le lien vers VOX apparaît, et la clé part chez lui.

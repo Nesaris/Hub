@@ -1910,6 +1910,9 @@ test('autorisation : chaque route balayée sans session, en lecture seule et en 
     'GET /api/secrets/logo/x',
     'POST /api/secrets/test',
     'POST /api/secrets/telegram/chats',
+    'POST /api/secrets/telegram/verifier',
+    'POST /api/secrets/telegram/liaison',
+    'POST /api/secrets/telegram/liaison/x',
     'POST /api/secrets/elevenlabs/voix',
     'GET /api/secrets/elevenlabs/apercu/x',
     'POST /api/secrets',
@@ -2043,6 +2046,26 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
   await renforcer();
   await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: 'pas-un-compte' }] }), /n’est pas un compte Telegram/);
   await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: compte.service, utilisateurs: ['@ana'] }] }), /identifiants Telegram/);
+  // Pas relié : il ne s'active pas.
+  await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: compte.service }] }), /n’est pas encore relié/);
+  // Relier pas à pas : jeton vérifié, code envoyé au bot, discussion prouvée.
+  const relier = async (service, token, chat) => {
+    await assert.rejects(api('POST', '/api/secrets/telegram/verifier', { token: 'pas-un-jeton' }), /Ce n’est pas un jeton de bot/);
+    const ver = await api('POST', '/api/secrets/telegram/verifier', { service, token });
+    assert.equal(ver.bot, `@bot_${token.slice(0, 6)}`);
+    const l = await api('POST', '/api/secrets/telegram/liaison', { service });
+    assert.match(l.code, /^\d{6}$/);
+    assert.equal(l.lien, `https://t.me/bot_${token.slice(0, 6)}?start=${l.code}`);
+    fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 1, chat: { id: 999 }, from: { id: 999 }, text: '/start 000000' } });
+    fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 2, chat: { id: Number(chat), type: 'private', first_name: 'Moi' }, from: { id: Number(chat) }, text: `/start ${l.code}` } });
+    const fin = await api('POST', `/api/secrets/telegram/liaison/${l.id}`, {});
+    assert.equal(fin.chat.id, String(chat), 'la discussion qui a envoyé le code, pas une autre');
+    assert.ok(fake.state.tg.sent.some(m => m.bot === token && /Relié au Hub/.test(m.text)));
+    const r = await api('POST', '/api/secrets', { service, champs: { CHAT_ID: String(chat) }, preuve: l.id });
+    assert.equal(r.relie, true);
+  };
+  await relier(compte.service, JETON, CHAT);
+  assert.equal((await api('GET', '/api/bots-ia')).comptes.find(c => c.service === compte.service).relie, true);
   const v = await api('PUT', '/api/bots-ia', { bots: [{ service: compte.service }] });
   assert.equal(v.bots.length, 1);
   await waitFor(async () => tg.appels.some(a => a.methode === 'getMe' && a.bot === JETON), 5000);
@@ -2158,6 +2181,7 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
 
   // Depuis le Hub : « connecte le bot qui correspond à <service> » — le bot par son nom, ou une question.
   await api('POST', '/api/secrets', { service: 'telegram', compte: 'Dockeur', champs: { BOT_TOKEN: '888888:BOTDOCKEURABCDEFGHIJKLMNOPQR', CHAT_ID: String(CHAT) } });
+  await relier((await api('GET', '/api/bots-ia')).comptes.find(c => c.canal === 'Telegram (Dockeur)').service, '888888:BOTDOCKEURABCDEFGHIJKLMNOPQR', CHAT);
   const b1 = await api('POST', '/api/agent/ask', { text: `connecte le bot Telegram qui correspond à ${dc.name}` });
   assert.equal(b1.model, 'Hub', 'sans le modèle');
   assert.match(b1.reply, /Je branche le bot \*\*Dockeur\*\* sur \*\*/);
@@ -2191,6 +2215,13 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
   assert.deepEqual(vide.chats, []);
   assert.equal(vide.bot, '@bot_777777');
   assert.ok(vide.deja.includes('Assistant'), JSON.stringify(vide));
+
+  // Un autre jeton posé sur un compte relié : la liaison tombe, il faut relier à nouveau.
+  const svcAssistant = (await api('GET', '/api/bots-ia')).comptes.find(c => c.canal === 'Telegram (Assistant)').service;
+  await api('PUT', '/api/bots-ia', { bots: [] });
+  await api('POST', '/api/secrets', { service: svcAssistant, champs: { BOT_TOKEN: '777777:UNAUTREJETONABCDEFGHIJKLMNO' } });
+  assert.equal((await api('GET', '/api/bots-ia')).comptes.find(c => c.service === svcAssistant).relie, false);
+  await assert.rejects(api('PUT', '/api/bots-ia', { bots: [{ service: svcAssistant }] }), /pas encore relié/);
 
   // Débrancher : plus personne n'écoute ce bot.
   await api('PUT', '/api/bots-ia', { bots: [] });

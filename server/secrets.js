@@ -53,9 +53,9 @@ export const CATALOGUE = [
     C('VOICE_ID', 'Identifiant de voix', 'Vide = la voix choisie dans VOX.'),
     C('MODEL', 'Modèle', 'eleven_flash_v2_5 (rapide, conseillé) ou eleven_multilingual_v2 (plus riche).'),
   ] },
-  { id: 'telegram', domaine: 'telegram.org', couleur: '#26A5E4', categorie: 'Notifications', ou: 'Parle à @BotFather dans Telegram : /newbot donne le jeton.', nom: 'Telegram', champs: [
-    S('BOT_TOKEN', 'Jeton du bot', 'Obtenu auprès de @BotFather.'),
-    C('CHAT_ID', 'Identifiant de discussion', 'Commence souvent par -100.'),
+  { id: 'telegram', domaine: 'telegram.org', couleur: '#26A5E4', categorie: 'Notifications', ou: 'Dans Telegram, @BotFather : /newbot crée le bot et donne son jeton. Colle-le ici : le Hub le vérifie, puis tu relies ta discussion avec un code.', nom: 'Telegram', champs: [
+    S('BOT_TOKEN', 'Jeton du bot', 'Obtenu auprès de @BotFather (/mybots → ton bot → API Token).'),
+    C('CHAT_ID', 'Identifiant de discussion', 'Rempli tout seul quand tu relies le bot.'),
   ] },
   { id: 'discord', domaine: 'discord.com', couleur: '#5865F2', categorie: 'Notifications', ou: 'Paramètres du salon → Intégrations → Webhooks.', nom: 'Discord', champs: [S('WEBHOOK_URL', 'URL du webhook')] },
   { id: 'slack', domaine: 'slack.com', couleur: '#611F69', categorie: 'Notifications', ou: 'api.slack.com/apps → Incoming Webhooks.', nom: 'Slack', champs: [S('WEBHOOK_URL', 'URL du webhook')] },

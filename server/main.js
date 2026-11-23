@@ -32,6 +32,7 @@ import { CerveauHub } from './ai/cerveau.js';
 import { JournalHub } from './ai/journal.js';
 import { Agent } from './ai/agent.js';
 import { BotsIA } from './ai/bots.js';
+import { LiaisonTelegram } from './telegram-liaison.js';
 import { Router, createServer } from './http/server.js';
 import { lireTls } from './http/tls.js';
 import { Connexions } from './connexions.js';
@@ -169,6 +170,10 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   hub.accesHub = accesHub;
   // Parler à l'assistant depuis Telegram : un bot par service, un pour tout, ou un groupe.
   const bots = new BotsIA({ db, audit, agent, services, connexions, alertes });
+  // Relier un bot Telegram : jeton vérifié, discussion prouvée par un code.
+  const liaison = new LiaisonTelegram({ db, secrets, audit, lecteurs: jeton => bots.gere(jeton) || (alertes.ecoute && !alertes.ecoute.signal.aborted && alertes.telegram()?.token === jeton) });
+  bots.liaison = liaison;
+  hub.liaison = liaison;
   alertes.bots = bots;
   hub.bots = bots;
   agent.bots = bots;
