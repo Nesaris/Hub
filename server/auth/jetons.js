@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import { HttpError } from '../util/common.js';
 
-export const PORTEES = { assistant: 'Poser des questions à l’assistant (ne peut rien exécuter)' };
+export const PORTEES = { assistant: 'Poser des questions à l’assistant (ne peut rien exécuter)', maintenance: 'Relire le catalogue et mettre les services à jour à sa version (rien d’autre)' };
 const NOM_OK = /^[\p{L}\p{N}][\p{L}\p{N} ._-]{0,39}$/u;
 const empreinte = t => crypto.createHash('sha256').update(t).digest('hex');
 

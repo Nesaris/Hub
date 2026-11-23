@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.21.0",
+    "date": "2026-11-23",
+    "points": [
+      "Jeton « maintenance » (créé sur la machine) : relire le catalogue et mettre les services à jour à leur version, rien d’autre — pour les mises à jour faites hors de l’interface."
+    ]
+  },
+  {
     "version": "0.20.3",
     "date": "2026-11-23",
     "points": [

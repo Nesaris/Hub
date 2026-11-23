@@ -28,7 +28,7 @@ import { coupure, poserCoupure, FONCTIONS } from './coupure.js';
 console.log = (...a) => process.stderr.write(a.join(' ') + '\n');
 console.info = console.log;
 
-const USAGE = 'Usage : node server/cli.js jeton <nom> [assistant] | sauvegarde | restaurer <clé-privée.pem> <cible.db> | coupure [ia|workflows oui|non]\n';
+const USAGE = 'Usage : node server/cli.js jeton <nom> [assistant|maintenance] | sauvegarde | restaurer <clé-privée.pem> <cible.db> | coupure [ia|workflows oui|non]\n';
 const [commande, a1, a2] = process.argv.slice(2);
 const base = () => openDb(path.join(config.dataDir, 'hub.db'));
 

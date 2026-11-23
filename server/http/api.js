@@ -148,7 +148,7 @@ export function registerRoutes(routeur, h) {
     adaptation.lancer(ctx.body.repo, ctx.user);
     return { repo: ctx.body.repo, etat: 'en-cours' };
   }, { role: 'admin', quota: { nom: 'adaptation', minute: 10, jour: 200 } });
-  r.post('/api/catalog/refresh', ctx => (ctx.body?.auto ? registry.refreshAuto() : registry.refresh(ctx.user)), { role: 'admin', quota: { nom: 'catalogue', minute: 60, jour: 2000 } });
+  r.post('/api/catalog/refresh', ctx => (ctx.body?.auto ? registry.refreshAuto() : registry.refresh(ctx.user)), { role: 'admin', jeton: 'maintenance', quota: { nom: 'catalogue', minute: 60, jour: 2000 } });
   r.put('/api/catalog/sources', ctx => { registry.setSources(ctx.body.sources || [], ctx.user); return registry.refresh(ctx.user); }, { role: 'admin' });
   r.post('/api/catalog/import', ctx => registry.importManifest(ctx.body.manifest, ctx.user), { role: 'admin', bodyLimit: 2 * 1024 * 1024 });
 
@@ -308,7 +308,7 @@ export function registerRoutes(routeur, h) {
     return { ...vueTheme(), appliqueA: services.appliquerGamme(ctx.user, gammesAvant, dispositionsAvant) };
   }, { role: 'admin' });
 
-  r.get('/api/instances', () => services.list().map(i => services.publicView(i)));
+  r.get('/api/instances', () => services.list().map(i => services.publicView(i)), { jeton: 'maintenance' });
   r.post('/api/instances', async ctx => {
     const inst = await services.add(ctx.body.extId, ctx.body, ctx.user);
     probes.sync();
@@ -348,7 +348,8 @@ export function registerRoutes(routeur, h) {
   }, { role: 'admin' });
   r.post('/api/instances/:id/manifest', ctx => { const out = services.syncManifest(ctx.params.id, ctx.user); probes.sync(); return out; }, { role: 'admin' });
   r.post('/api/instances/:id/autos', ctx => h.capabilities.recreer(ctx.params.id, ctx.user), { role: 'admin' });
-  r.post('/api/instances/:id/update', async ctx => { const out = await services.update(ctx.params.id, ctx.user); probes.sync(); return out; }, { role: 'admin' });
+  // Une mise à jour à la version du catalogue : aussi par un jeton « maintenance » (créé sur la machine, docker exec hub node server/cli.js jeton <nom> maintenance).
+  r.post('/api/instances/:id/update', async ctx => { const out = await services.update(ctx.params.id, ctx.user); probes.sync(); return out; }, { role: 'admin', jeton: 'maintenance' });
   r.post('/api/instances/:id/redeploy', async ctx => { const out = await services.redeploy(ctx.params.id, ctx.user); probes.sync(); return out; }, { role: 'admin' });
   r.del('/api/instances/:id', async ctx => { const out = await services.remove(ctx.params.id, { deleteVolumes: ctx.query.volumes === '1' }, ctx.user); probes.sync(); return out; }, { role: 'admin' });
   r.post('/api/instances/:id/check', async ctx => {

@@ -1786,6 +1786,14 @@ test('jetons d’accès : l’assistant et rien d’autre, sans jamais rien exé
   assert.equal((await porteur('hubj_' + 'x'.repeat(43), 'POST', '/api/agent/ask', { text: 'salut' })).status, 401);
   await api('DELETE', `/api/jetons/${id}`);
   assert.equal((await porteur(jeton, 'POST', '/api/agent/ask', { text: 'salut' })).status, 401);
+
+  // « maintenance » : relire le catalogue et mettre à jour un service, rien d'autre.
+  const m = await api('POST', '/api/jetons', { nom: 'maj', portee: 'maintenance' });
+  assert.equal((await porteur(m.jeton, 'GET', '/api/instances')).status, 200);
+  assert.equal((await porteur(m.jeton, 'POST', '/api/catalog/refresh', {})).status, 200);
+  assert.equal((await porteur(m.jeton, 'POST', '/api/instances/inconnu/update', {})).status, 404, 'la route est ouverte, le service inconnu');
+  for (const [me, p] of [['POST', '/api/agent/ask'], ['GET', '/api/secrets'], ['DELETE', '/api/instances/x'], ['PUT', '/api/ai-autonomy'], ['POST', '/api/instances/x/redeploy']]) assert.equal((await porteur(m.jeton, me, p, me === 'GET' ? undefined : {})).status, 403, `${me} ${p}`);
+  await api('DELETE', `/api/jetons/${m.id}`);
 });
 
 test('destinations internes : refusées tant qu’un administrateur ne les a pas autorisées, métadonnées jamais', async () => {
