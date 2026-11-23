@@ -587,7 +587,12 @@ export function registerRoutes(routeur, h) {
       const c = (u.message || u.channel_post || u.my_chat_member || u.edited_message || {}).chat;
       if (c && !vus.has(c.id)) vus.set(c.id, { id: String(c.id), nom: c.title || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.username || String(c.id), type: c.type });
     }
-    return { chats: [...vus.values()] };
+    if (vus.size) return { chats: [...vus.values()] };
+    // Rien : on dit à quel bot ce jeton appartient, et qui le lit peut-être déjà.
+    const appel = m => sortir(`${config.telegramApi}/bot${token}/${m}`, { signal: AbortSignal.timeout(8000) }).then(x => x.json()).catch(() => ({}));
+    const [moi, wh] = await Promise.all([appel('getMe'), appel('getWebhookInfo')]);
+    const deja = secrets.list().filter(x => x.service !== svc && x.champs.some(c => c.key.endsWith('_BOT_TOKEN') && c.rempli && secrets.valeur(c.key) === token)).map(x => x.compte || x.nom);
+    return { chats: [], bot: moi?.result?.username ? '@' + moi.result.username : null, webhook: !!wh?.result?.url, deja };
   }, { role: 'admin' });
   const ELEVEN_PAS_UNE_CLE = 'Ce n’est pas la clé d’API ElevenLabs mais son identifiant : une clé commence par « sk_ ». Crée une nouvelle clé (Developers → API Keys → Create), copie-la au moment où elle s’affiche, et remplace celle enregistrée.';
   // ElevenLabs : les voix du compte, pour remplir l'identifiant sans aller le

@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.18.2",
+    "date": "2026-11-23",
+    "points": [
+      "Clés & API → Telegram : quand « Trouver l’identifiant » ne voit aucun message, le Hub dit à quel bot appartient le jeton collé, et s’il est déjà lu ailleurs (autre compte, webhook)."
+    ]
+  },
+  {
     "version": "0.18.1",
     "date": "2026-11-23",
     "points": [

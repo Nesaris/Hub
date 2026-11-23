@@ -2185,6 +2185,13 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
   assert.equal(deux.status, 'answered');
   assert.match(deux.reply, /ne prend qu’une IA à la fois \(seul \*\*MuxAI\*\* en réunit plusieurs\)\. Laquelle je branche : \*\*Claude\*\* ou \*\*Qwen\*\*/);
 
+  // Aucun message trouvé : le Hub dit à quel bot appartient le jeton, et s'il est déjà enregistré.
+  tg.updates = [];
+  const vide = await api('POST', '/api/secrets/telegram/chats', { service: 'telegram', token: JETON });
+  assert.deepEqual(vide.chats, []);
+  assert.equal(vide.bot, '@bot_777777');
+  assert.ok(vide.deja.includes('Assistant'), JSON.stringify(vide));
+
   // Débrancher : plus personne n'écoute ce bot.
   await api('PUT', '/api/bots-ia', { bots: [] });
   assert.equal(hub.bots.gere(JETON), false);

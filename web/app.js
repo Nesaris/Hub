@@ -2651,7 +2651,12 @@ function ficheSecret(d, { id, perso, existant }, apres) {
         if (tg) tg.onclick = () => pulse(tg, async () => {
           const r = await POST('/api/secrets/telegram/chats', { service: existant?.service || c.id, token: valeurDe(box, 'BOT_TOKEN')?.value || '' });
           const out = $('#tgOut', box);
-          if (!r.chats.length) { out.textContent = 'Aucun message reçu par le bot : écris-lui /start dans Telegram, puis réessaie.'; return; }
+          if (!r.chats.length) {
+            out.textContent = [r.bot ? `Ce jeton est celui de ${r.bot} : c’est à lui qu’il faut écrire /start dans Telegram, puis réessayer.` : 'Aucun message reçu par le bot : écris-lui /start dans Telegram, puis réessaie.',
+              r.webhook ? 'Ce bot envoie ses messages à une adresse web (webhook) : un autre programme le lit, le Hub ne voit rien passer.' : '',
+              r.deja?.length ? `Ce jeton est déjà enregistré ici (${r.deja.join(', ')}) : ce qui le lit prend les messages avant toi. Reprends l’identifiant de discussion de ce compte-là.` : ''].filter(Boolean).join(' ');
+            return;
+          }
           poser(out, r.chats.map(ch => [html`<button class="chip a" type="button" data-chat=${ch.id} title=${ch.type}>${ch.nom} · ${ch.id}</button>`, ' ']));
           $$('[data-chat]', out).forEach(b => { b.onclick = () => { valeurDe(box, 'CHAT_ID').value = b.dataset.chat; toast(`Identifiant ${b.dataset.chat} repris`); }; });
           if (r.chats.length === 1) { valeurDe(box, 'CHAT_ID').value = r.chats[0].id; toast('Identifiant rempli'); }
