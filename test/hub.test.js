@@ -2053,13 +2053,27 @@ test('l’assistant sur Telegram : demande en clair, questions en boutons, valid
     await assert.rejects(api('POST', '/api/secrets/telegram/verifier', { token: 'pas-un-jeton' }), /Ce n’est pas un jeton de bot/);
     const ver = await api('POST', '/api/secrets/telegram/verifier', { service, token });
     assert.equal(ver.bot, `@bot_${token.slice(0, 6)}`);
+    // Un /start d'avant la liaison ne compte pas.
+    fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 1, chat: { id: 999 }, from: { id: 999 }, text: '/start' } });
     const l = await api('POST', '/api/secrets/telegram/liaison', { service });
-    assert.match(l.code, /^\d{6}$/);
-    assert.equal(l.lien, `https://t.me/bot_${token.slice(0, 6)}?start=${l.code}`);
-    fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 1, chat: { id: 999 }, from: { id: 999 }, text: '/start 000000' } });
-    fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 2, chat: { id: Number(chat), type: 'private', first_name: 'Moi' }, from: { id: Number(chat) }, text: `/start ${l.code}` } });
-    const fin = await api('POST', `/api/secrets/telegram/liaison/${l.id}`, {});
-    assert.equal(fin.chat.id, String(chat), 'la discussion qui a envoyé le code, pas une autre');
+    assert.equal(l.etape, 'start');
+    assert.equal(l.lien, `https://t.me/bot_${token.slice(0, 6)}`);
+    const attendre = async (vouloir, ecrire) => {
+      for (let n = 0; n < 10; n++) {
+        const p = api('POST', `/api/secrets/telegram/liaison/${l.id}`, {});
+        if (n === 0) setTimeout(ecrire, 300);
+        const r = await p;
+        if (r.etape === vouloir) return r;
+      }
+      throw new Error('liaison bloquée');
+    };
+    const ecrireDe = (de, text) => () => fake.state.tg.updates.push({ update_id: ++fake.state.tg.id, bot: token, message: { message_id: 2, chat: { id: Number(de), type: 'private', first_name: 'Moi' }, from: { id: Number(de) }, text } });
+    // Étape 2 : /start depuis sa discussion ; étape 3 : le code, depuis la même discussion.
+    const c = await attendre('code', ecrireDe(chat, '/start'));
+    assert.match(c.code, /^\d{6}$/);
+    assert.ok(fake.state.tg.sent.some(m => m.bot === token && /Envoie maintenant ici le code/.test(m.text)));
+    const fin = await attendre('fini', () => { ecrireDe(4444, c.code)(); ecrireDe(chat, '123')(); ecrireDe(chat, c.code)(); });
+    assert.equal(fin.chat.id, String(chat), 'la discussion qui a envoyé /start et le code, pas une autre');
     assert.ok(fake.state.tg.sent.some(m => m.bot === token && /Relié au Hub/.test(m.text)));
     const r = await api('POST', '/api/secrets', { service, champs: { CHAT_ID: String(chat) }, preuve: l.id });
     assert.equal(r.relie, true);

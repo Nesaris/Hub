@@ -107,8 +107,10 @@ export function startFake() {
       }
       if (p.endsWith('/getUpdates')) {
         // `coupuresEcoute` : autant d'attentes coupées net (réseau qui lâche pendant l'écoute).
-        if (tg.coupuresEcoute > 0 && url.searchParams.get('offset') !== '-1') { tg.coupuresEcoute--; return req.socket.destroy(); }
-        const off = Number(url.searchParams.get('offset') || 0);
+        // Les paramètres arrivent dans l'adresse (GET) ou dans le corps JSON (POST).
+        const param = k => url.searchParams.get(k) ?? (body && body[k] != null ? String(body[k]) : null);
+        if (tg.coupuresEcoute > 0 && param('offset') !== '-1') { tg.coupuresEcoute--; return req.socket.destroy(); }
+        const off = Number(param('offset') || 0);
         // Une mise à jour peut viser un seul bot (`bot`) : les autres ne la voient pas.
         const pourMoi = u => !u.bot || u.bot === jeton;
         const liste = (off < 0 ? tg.updates.slice(off) : tg.updates.filter(u => u.update_id >= off)).filter(pourMoi);

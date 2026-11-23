@@ -2593,7 +2593,40 @@ function ficheSecret(d, { id, perso, existant }, apres) {
   const nouveauCompte = c && !existant;
   let champs = c ? c.champs.map(f => ({ ...f })) : (existant ? existant.champs.map(k => ({ key: k.label || k.key, label: k.label, secret: k.secret })) : [{ key: '', label: '' }, { key: '', label: '' }]);
   const nomInit = c ? c.nom : (existant?.service || '');
-  const corps = () => html`
+  // Telegram : un assistant en quatre écrans — jeton, /start, code, relié.
+  const corpsTelegram = () => html`
+    <div class="sec-fiche-tete">${logoTuile(c.id, c.nom, c.couleur, 56, c.domaine)}<div><b>Telegram</b><small>${existant ? `Relier à nouveau ${existant.compte || 'ce bot'}` : 'Ajouter un bot, pas à pas'}</small></div></div>
+    <ol class="tg-points" aria-label="Étapes">${['Jeton', '/start', 'Code', 'Relié'].map((t, k) => html`<li data-point=${k + 1} class=${k ? '' : 'on'}><span>${k + 1}</span>${t}</li>`)}</ol>
+    <section class="tg-pas" data-pas="1">
+      <h4>Colle le jeton de ton bot</h4>
+      <p class="help">Dans Telegram, ouvre @BotFather : /newbot crée un bot, /mybots → ton bot → API Token redonne son jeton.</p>
+      <div class="fl"><label for="secCompte">Nom de ce compte${nouveauCompte && aDefaut ? '' : ' (facultatif)'}</label>
+        <input class="field" id="secCompte" value=${existant?.compte || ''} readonly=${!!existant} placeholder="ex. Hub, Relay, Alertes"></div>
+      <div class="fl"><label for="tgJetonChamp">Jeton du bot</label>
+        <input class="field mono" id="tgJetonChamp" data-f="BOT_TOKEN" type="password" autocomplete="new-password" placeholder=${existant ? 'vide = garder le jeton enregistré' : '123456789:AAE…'}></div>
+      <div class="tg-etat" id="tgEtat">${existant ? 'Laisse vide pour garder le jeton enregistré, ou colle-en un nouveau.' : 'Il est vérifié dès que tu le colles.'}</div>
+      <input type="hidden" data-f="CHAT_ID" id="tgChat">
+      <div class="row"><button class="btn solid sm" type="button" id="tgSuite1" disabled=${!existant}>Continuer</button></div>
+    </section>
+    <section class="tg-pas" data-pas="2" hidden>
+      <h4>Envoie /start à ton bot</h4>
+      <p class="help">Ouvre <b id="tgNomBot"></b> dans Telegram et appuie sur Démarrer (ou envoie /start). Pour un groupe : ajoute d'abord le bot au groupe, puis envoie /start dans le groupe.</p>
+      <div class="row"><a class="btn solid sm" id="tgOuvrir" target="_blank" rel="noopener">${I('send', 13)}Ouvrir dans Telegram</a></div>
+      <div class="tg-etat attente" id="tgEtat2">En attente de ton /start…</div>
+    </section>
+    <section class="tg-pas" data-pas="3" hidden>
+      <h4>Envoie ce code au bot</h4>
+      <p class="help">Dans la même discussion (<b id="tgOu"></b>), envoie ce code. C'est ce qui prouve que la discussion est bien la tienne.</p>
+      <div class="tg-code-grand mono" id="tgCode"></div>
+      <div class="tg-etat attente" id="tgEtat3">En attente du code…</div>
+    </section>
+    <section class="tg-pas" data-pas="4" hidden>
+      <h4>✓ Bot relié</h4>
+      <p class="help" id="tgFin"></p>
+      <p class="help">Enregistre pour terminer. Ensuite, Réglages → L'assistant sur Telegram pour l'activer.</p>
+    </section>
+    <div id="secErr"></div>`;
+  const corps = () => c?.id === 'telegram' ? corpsTelegram() : html`
     <div class="sec-fiche-tete">${logoTuile(c ? c.id : (existant?.service || 'nouveau'), nomInit || '+', c?.couleur, 56, c ? c.domaine : existant?.domaine)}
       <div><b>${nomInit || 'Service personnalisé'}</b><small>${c ? c.categorie : 'Tes propres clés, scellées dans le coffre'}</small></div></div>
     ${c?.ou ? html`<div class="hookbox"><b>Où le trouver</b><span>${c.ou}</span></div>` : ''}
@@ -2607,12 +2640,10 @@ function ficheSecret(d, { id, perso, existant }, apres) {
       ? html`<div class="formgrid"><div class="fl"><label for="sk${i}">Nom du champ</label><input class="field mono" id="sk${i}" data-k=${i} value=${f.key} placeholder="API_KEY"></div>
          <div class="fl"><label for="sv${i}">Valeur${existant?.champs[i]?.rempli && existant.champs[i].secret ? html` <span class="devoiler-ici" data-cle=${existant.champs[i].key}></span>` : ''}</label><input class="field mono" id="sv${i}" type="password" data-f=${i} autocomplete="new-password" placeholder=${existant ? 'vide = inchangé' : ''}></div></div>`
       : html`<div class="fl"><label for="sv${i}">${I(f.secret ? 'key' : 'text', 12)} ${f.label} <span class="mono mini" data-prefixe=${f.key}>${c.id.toUpperCase()}_${f.key}</span>${deja?.champs.some(k => k.key.endsWith('_' + f.key) && k.rempli) ? html` <span class="chip a">enregistré</span>${f.secret ? html` <span class="devoiler-ici" data-cle=${deja.champs.find(k => k.key.endsWith('_' + f.key)).key}></span>` : ''}` : ''}</label>
-         <input class="field mono" id="sv${i}" data-f=${f.key} type=${f.secret ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.secret && deja ? 'vide = inchangé' : c.id === 'telegram' && f.key === 'CHAT_ID' ? 'rempli à l’étape 2' : ''} readonly=${c.id === 'telegram' && f.key === 'CHAT_ID'}>
+         <input class="field mono" id="sv${i}" data-f=${f.key} type=${f.secret ? 'password' : 'text'} autocomplete="new-password" placeholder=${f.secret && deja ? 'vide = inchangé' : ''}>
          ${f.help ? html`<div class="help">${f.help}</div>` : ''}
          ${c.id === 'elevenlabs' && f.key === 'VOICE_ID' ? html`<div class="row avec-marge"><button class="btn sm" id="elVoix" type="button">${I('mic', 13)}Choisir une voix</button><span class="mini" id="elMsg">Liste les voix de ton compte (la clé est vérifiée au passage).</span></div><div id="elOut"></div>` : ''}
-         ${c.id === 'telegram' && f.key === 'BOT_TOKEN' ? html`<div class="tg-etape" id="tgJeton"><span class="tg-num">1</span><span class="mini">${deja ? 'Jeton enregistré : colle un nouveau jeton pour changer de bot, ou relie directement.' : 'Colle le jeton : il est vérifié tout de suite.'}</span></div>` : ''}
-         ${c.id === 'telegram' && f.key === 'CHAT_ID' ? html`<div class="tg-etape" id="tgLien"><span class="tg-num">2</span><div class="grow"><button class="btn sm solid" id="tgRelier" type="button" disabled=${!deja}>${I('send', 13)}Relier le bot</button>
-           <div class="mini" id="tgOut">Le Hub te donne un code : tu l’envoies au bot dans Telegram (un seul bouton), et la discussion se relie toute seule.</div></div></div>` : ''}</div>`)}</div>
+</div>`)}</div>
     ${perso ? html`<button class="btn sm" id="secPlus">${I('plus', 13)}Ajouter un champ</button>` : ''}
     <div id="secErr"></div>`;
   const valeurDe = (box, cle) => [...box.querySelectorAll('[data-f]')].find(x => x.dataset.f === cle);
@@ -2651,50 +2682,61 @@ function ficheSecret(d, { id, perso, existant }, apres) {
         };
         if (cpt && c) { cpt.oninput = majPrefixe; majPrefixe(); }
         // Telegram : l'identifiant de discussion se lit dans les messages reçus par le bot.
-        // Telegram pas à pas : 1. le jeton se vérifie seul ; 2. un code envoyé au bot relie la discussion.
-        const tgJ = $('#tgJeton', box), tgR = $('#tgRelier', box), tgO = $('#tgOut', box);
-        if (tgJ && tgR) {
-          const jeton = valeurDe(box, 'BOT_TOKEN'), chat = valeurDe(box, 'CHAT_ID');
-          const service = existant?.service || c.id;
-          const etat = (el, ok, texte) => { el.classList.toggle('ok', ok === true); el.classList.toggle('ko', ok === false); $('.mini', el).textContent = texte; };
-          let minuteur = null, tour = 0;
+        // Telegram, écran par écran : jeton vérifié → /start reçu → code reçu → relié.
+        if (c?.id === 'telegram') {
+          const jeton = $('#tgJetonChamp', box), chat = $('#tgChat', box), service = existant?.service || c.id;
+          const enregistrer = [...me.querySelectorAll('.pied .btn')].find(b => b.classList.contains('solid'));
+          if (enregistrer) enregistrer.disabled = true;
+          const aller = n => {
+            $$('.tg-pas', box).forEach(p => { p.hidden = Number(p.dataset.pas) !== n; });
+            $$('[data-point]', box).forEach(p => { const k = Number(p.dataset.point); p.classList.toggle('on', k === n); p.classList.toggle('fait', k < n); });
+            if (enregistrer) enregistrer.disabled = n !== 4;
+          };
+          const etat = (el, ok, texte) => { el.classList.toggle('ok', ok === true); el.classList.toggle('ko', ok === false); el.textContent = texte; };
+          let minuteur = null, tour = 0, liaison = null;
           const verifier = async () => {
             const t = jeton.value.replace(/\s+/g, '');
-            delete box.dataset.preuve; chat.value = chat.value && !t ? chat.value : '';
-            if (!t) { tgR.disabled = !existant; return; }
-            if (!/^\d+:[\w-]{20,}$/.test(t)) { etat(tgJ, false, 'Ce n’est pas un jeton de bot : il ressemble à 123456789:AAE…'); tgR.disabled = true; return; }
+            const suite = $('#tgSuite1', box);
+            if (!t) { etat($('#tgEtat', box), null, existant ? 'Le jeton enregistré sera gardé.' : 'Il est vérifié dès que tu le colles.'); suite.disabled = !existant; return; }
+            if (!/^\d+:[\w-]{20,}$/.test(t)) { etat($('#tgEtat', box), false, 'Ce n’est pas un jeton de bot : il ressemble à 123456789:AAE…'); suite.disabled = true; return; }
             const n = ++tour;
-            etat(tgJ, null, 'Vérification auprès de Telegram…');
+            etat($('#tgEtat', box), null, 'Vérification auprès de Telegram…');
             try {
               const v = await POST('/api/secrets/telegram/verifier', { service, token: t });
               if (n !== tour) return;
-              etat(tgJ, true, `✓ Jeton valide : ${v.bot} (${v.nom})${v.deja.length ? ` — déjà enregistré ici (${v.deja.join(', ')})` : ''}${v.webhook ? ' — attention : un webhook le lit ailleurs' : ''}`);
-              tgR.disabled = false;
-            } catch (e) { if (n === tour) { etat(tgJ, false, e.message); tgR.disabled = true; } }
+              etat($('#tgEtat', box), true, `✓ Jeton valide : ${v.bot}${v.nom ? ` (${v.nom})` : ''}${v.deja.length ? ` — déjà enregistré ici : ${v.deja.join(', ')}` : ''}`);
+              suite.disabled = false;
+            } catch (e) { if (n === tour) { etat($('#tgEtat', box), false, e.message); suite.disabled = true; } }
           };
-          jeton.oninput = () => { clearTimeout(minuteur); minuteur = setTimeout(verifier, 500); };
-          jeton.onpaste = () => { clearTimeout(minuteur); minuteur = setTimeout(verifier, 50); };
-          tgR.onclick = async () => {
-            tgR.disabled = true;
-            try {
-              const l = await POST('/api/secrets/telegram/liaison', { service, token: jeton.value.replace(/\s+/g, '') });
-              poser(tgO, html`<div class="tg-code"><a class="btn sm solid" href=${l.lien} target="_blank" rel="noopener">${I('send', 13)}Ouvrir ${l.bot} et appuyer sur Démarrer</a>
-                <span class="mini">ou envoie-lui ce message : <b class="mono">/start ${l.code}</b> · dans un groupe, ajoute d’abord le bot puis envoie le code</span>
-                <span class="mini" id="tgAttente">En attente du code…</span></div>`);
-              for (;;) {
-                if (!box.isConnected) return;
-                let r;
-                try { r = await POST(`/api/secrets/telegram/liaison/${encodeURIComponent(l.id)}`, {}); }
-                catch (e) { poser(tgO, html`<span class="err">${e.message}</span>`); tgR.disabled = false; return; }
-                if (r.ok) {
-                  chat.value = r.chat.id; box.dataset.preuve = l.id;
-                  $('#tgLien', box).classList.add('ok');
-                  poser(tgO, html`<span class="mini">✓ Relié à ${r.chat.type === 'private' ? 'ta discussion avec le bot' : `« ${r.chat.nom} »`} (${r.chat.id}). Enregistre pour terminer.</span>`);
-                  toast('Bot relié ✓');
-                  return;
-                }
+          jeton.oninput = () => { clearTimeout(minuteur); minuteur = setTimeout(verifier, 400); };
+          // Attendre la suite côté Telegram : un appel tient jusqu'à 20 s, on relance tant que la fenêtre est ouverte.
+          const suivre = async () => {
+            for (;;) {
+              if (!box.isConnected || !liaison) return;
+              let r;
+              try { r = await POST(`/api/secrets/telegram/liaison/${encodeURIComponent(liaison.id)}`, {}); }
+              catch (e) { const el = $('.tg-pas:not([hidden]) .tg-etat', box); if (el) etat(el, false, e.message); return; }
+              if (r.etape === 'code' && $('[data-pas="3"]', box).hidden) {
+                $('#tgCode', box).textContent = r.code.replace(/(\d{3})(\d{3})/, '$1 $2');
+                $('#tgOu', box).textContent = r.chat.type === 'private' ? 'ta discussion avec le bot' : `le groupe « ${r.chat.nom} »`;
+                aller(3);
               }
-            } catch (e) { poser(tgO, html`<span class="err">${e.message}</span>`); tgR.disabled = false; }
+              if (r.etape === 'fini') {
+                chat.value = r.chat.id; box.dataset.preuve = liaison.id;
+                $('#tgFin', box).textContent = `Relié à ${r.chat.type === 'private' ? 'ta discussion avec le bot' : `« ${r.chat.nom} »`} (${r.chat.id}).`;
+                aller(4); toast('Bot relié ✓');
+                return;
+              }
+            }
+          };
+          $('#tgSuite1', box).onclick = async e => {
+            const b = e.currentTarget; b.disabled = true;
+            try {
+              liaison = await POST('/api/secrets/telegram/liaison', { service, token: jeton.value.replace(/\s+/g, '') });
+              $('#tgNomBot', box).textContent = liaison.bot;
+              $('#tgOuvrir', box).href = liaison.lien;
+              aller(2); suivre();
+            } catch (err) { etat($('#tgEtat', box), false, err.message); b.disabled = false; }
           };
         }
         // ElevenLabs : l'identifiant de voix se choisit dans la liste du compte.

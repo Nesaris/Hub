@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.19.1",
+    "date": "2026-11-23",
+    "points": [
+      "Ajouter un bot Telegram, écran par écran : 1. le jeton, vérifié dès qu’il est collé ; 2. envoie /start au bot ; 3. envoie-lui le code affiché ; 4. relié — et seulement alors, Enregistrer."
+    ]
+  },
+  {
     "version": "0.19.0",
     "date": "2026-11-23",
     "points": [

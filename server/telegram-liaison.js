@@ -41,42 +41,63 @@ export class LiaisonTelegram {
     return { bot: '@' + moi.result.username, nom: moi.result.first_name, id: String(moi.result.id), webhook: !!wh?.result?.url, deja, lu: this.lecteurs(token) };
   }
 
-  /** Étape 2 : un code à usage unique, et le lien qui l'envoie au bot d'un seul geste. */
+  /** Étape 2 : on attend le /start envoyé au bot (sa discussion devient connue). */
   async commencer(brut, service = '') {
     const v = await this.verifier(brut, service);
     if (v.webhook) throw new HttpError(409, `${v.bot} envoie ses messages à une adresse web (webhook) : un autre programme le lit. Retire le webhook, ou crée un autre bot pour le Hub.`);
+    if (v.lu) throw new HttpError(409, 'Ce bot est déjà lu par le Hub (assistant ou alertes) : coupe-le dans Réglages le temps de le relier, ou prends un autre bot.');
     const now = Date.now();
     for (const [k, l] of this.liaisons) if (l.expire < now) this.liaisons.delete(k);
     const id = crypto.randomBytes(12).toString('base64url');
-    const code = String(crypto.randomInt(100000, 1000000));
-    this.liaisons.set(id, { token: this.jeton(brut), code, offset: null, expire: now + DUREE, chat: null, bot: v.bot });
-    return { id, code, bot: v.bot, nom: v.nom, lien: `https://t.me/${v.bot.slice(1)}?start=${code}`, expire: now + DUREE };
+    this.liaisons.set(id, { token: this.jeton(brut), etape: 'start', code: null, offset: null, expire: now + DUREE, chat: null, candidat: null, bot: v.bot });
+    return { id, etape: 'start', bot: v.bot, nom: v.nom, lien: `https://t.me/${v.bot.slice(1)}`, expire: now + DUREE };
   }
 
-  /** Étape 3 : on attend (jusqu'à 20 s par appel) le message qui porte le code. */
+  /**
+   * Étapes 2 et 3 : jusqu'à 20 s par appel. D'abord le /start (on retient la
+   * discussion), puis un code à usage unique, envoyé depuis cette même
+   * discussion : c'est ce qui prouve qu'elle est à toi.
+   */
   async attendre(id) {
     const l = this.liaisons.get(String(id));
-    if (!l || l.expire < Date.now()) { this.liaisons.delete(String(id)); throw new HttpError(410, 'Ce code a expiré : recommence la liaison.'); }
-    if (l.chat) return { ok: true, chat: l.chat };
+    if (!l || l.expire < Date.now()) { this.liaisons.delete(String(id)); throw new HttpError(410, 'Trop long : recommence la liaison.'); }
+    if (l.chat) return { etape: 'fini', chat: l.chat };
     if (this.lecteurs(l.token)) throw new HttpError(409, 'Ce bot est déjà lu par le Hub (assistant ou alertes) : coupe-le dans Réglages le temps de le relier, ou prends un autre bot.');
-    if (l.offset == null) l.offset = 0;
+    if (l.offset == null) {
+      // Ce qui attendait avant l'ouverture de la liaison ne compte pas : un /start d'hier ne prouve rien.
+      const vieux = await this.appel(l.token, 'getUpdates', { offset: -1, timeout: 0 });
+      l.offset = vieux.ok && vieux.result?.length ? vieux.result.at(-1).update_id + 1 : 0;
+    }
     const j = await this.appel(l.token, 'getUpdates', { offset: l.offset, timeout: 20, allowed_updates: ['message'] }, 20);
     if (!j.ok) {
       if (/conflict/i.test(j.description || '')) throw new HttpError(409, `Un autre programme lit déjà ${l.bot} : le Hub ne voit pas passer tes messages. Arrête-le, ou crée un autre bot pour le Hub.`);
       throw new HttpError(502, `Telegram refuse : ${j.description}`);
     }
+    const dire = (chat, text) => this.appel(l.token, 'sendMessage', { chat_id: chat, text }).catch(() => {});
     for (const u of j.result || []) {
       l.offset = u.update_id + 1;
       const m = u.message;
-      if (!m?.chat || !String(m.text || '').includes(l.code) || m.from?.is_bot) continue;
+      if (!m?.chat || m.from?.is_bot) continue;
+      const texte = String(m.text || '').trim();
       const c = m.chat;
-      l.chat = { id: String(c.id), type: c.type, nom: c.title || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.username || String(c.id), de: String(m.from?.id ?? '') };
-      await this.appel(l.token, 'sendMessage', { chat_id: c.id, text: '✅ Relié au Hub. Retourne dans le Hub et enregistre.' }).catch(() => {});
-      // Les messages lus ici ne seront pas rejoués par l'assistant.
-      await this.appel(l.token, 'getUpdates', { offset: l.offset, timeout: 0 }).catch(() => {});
-      return { ok: true, chat: l.chat };
+      if (l.etape === 'start' && /^\/start(@\w+)?\b/i.test(texte)) {
+        l.candidat = { id: String(c.id), type: c.type, nom: c.title || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.username || String(c.id), de: String(m.from?.id ?? '') };
+        l.code = String(crypto.randomInt(100000, 1000000));
+        l.etape = 'code';
+        await dire(c.id, 'Bien reçu. Envoie maintenant ici le code affiché dans le Hub.');
+        return { etape: 'code', code: l.code, chat: { nom: l.candidat.nom, type: l.candidat.type } };
+      }
+      if (l.etape === 'code' && String(c.id) === l.candidat.id && texte.replace(/\s+/g, '') === l.code) {
+        l.chat = l.candidat;
+        l.etape = 'fini';
+        await dire(c.id, '✅ Relié au Hub. Retourne dans le Hub et enregistre.');
+        // Les messages lus ici ne seront pas rejoués par l'assistant.
+        await this.appel(l.token, 'getUpdates', { offset: l.offset, timeout: 0 }).catch(() => {});
+        return { etape: 'fini', chat: l.chat };
+      }
+      if (l.etape === 'code' && String(c.id) === l.candidat.id) await dire(c.id, 'Ce n’est pas le bon code : recopie celui du Hub.');
     }
-    return { attente: true };
+    return l.etape === 'code' ? { etape: 'code', code: l.code, chat: { nom: l.candidat.nom, type: l.candidat.type } } : { etape: l.etape };
   }
 
   /** À l'enregistrement : la preuve correspond-elle au jeton et à la discussion posés ? */

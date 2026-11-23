@@ -946,10 +946,22 @@ details.avance .help{margin:8px 0}
 .bot-ligne .row .field { flex: 1 1 200px; min-width: 0; }
 .plan-etapes { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; }
 
-/* Telegram pas à pas : jeton vérifié, puis discussion reliée par un code. */
-.tg-etape { display: flex; gap: 10px; align-items: flex-start; margin-top: 8px; }
-.tg-etape .tg-num { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; border: 1px solid var(--hair-soft); }
-.tg-etape.ok .tg-num { background: #2e9e6a; border-color: #2e9e6a; color: #fff; }
-.tg-etape.ko .tg-num { background: #c2413b; border-color: #c2413b; color: #fff; }
-.tg-etape .grow { display: grid; gap: 6px; min-width: 0; }
-.tg-code { display: grid; gap: 6px; }
+/* Telegram, écran par écran : jeton, /start, code, relié. */
+.tg-points { list-style: none; display: flex; gap: 6px; margin: 14px 0 16px; padding: 0; flex-wrap: wrap; }
+.tg-points li { display: flex; align-items: center; gap: 6px; font-size: 12px; opacity: .55; padding: 4px 10px 4px 4px; border-radius: 999px; border: 1px solid var(--hair-soft); }
+.tg-points li span { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-weight: 600; border: 1px solid var(--hair-soft); }
+.tg-points li.on { opacity: 1; }
+.tg-points li.fait { opacity: .85; }
+.tg-points li.fait span { background: #2e9e6a; border-color: #2e9e6a; color: #fff; }
+.tg-points li.on span { border-color: currentColor; font-weight: 700; }
+.tg-pas { display: grid; gap: 10px; }
+.tg-pas h4 { margin: 0; font-size: 16px; }
+.tg-pas .help { margin: 0; }
+.tg-pas .row { justify-content: flex-start; }
+.tg-etat { font-size: 13px; opacity: .8; text-align: left; justify-self: start; }
+.tg-etat.ok { color: #2e9e6a; opacity: 1; }
+.tg-etat.ko { color: #c2413b; opacity: 1; }
+.tg-etat.attente::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 8px; vertical-align: middle; border-radius: 50%; background: currentColor; animation: tg-pouls 1.2s ease-in-out infinite; }
+@keyframes tg-pouls { 50% { opacity: .2; } }
+@media (prefers-reduced-motion: reduce) { .tg-etat.attente::before { animation: none; } }
+.tg-code-grand { font-size: 34px; letter-spacing: .12em; font-weight: 600; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--hair-soft); justify-self: start; user-select: all; }
