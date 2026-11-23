@@ -495,7 +495,7 @@ const tuileExt = (extId, icone, v = '', cls = '') => html`<span class="itile log
 async function viewExt(el, t) {
   const [cat, inst] = await Promise.all([GET('/api/catalog'), GET('/api/instances')]);
   if (!alive(t)) return;
-  const onglets = html`<div class="tabs"><button class="view ${S.extTab === 'catalog' ? 'on' : ''}" data-tab="catalog">Catalogue<span class="n">${cat.items.filter(it => !inst.some(i => i.extId === it.id || i.remplacePar?.id === it.id)).length}</span></button><button class="view ${S.extTab === 'installed' ? 'on' : ''}" data-tab="installed">Mes services<span class="n">${inst.length}</span>${inst.some(i => i.miseAJour) ? html`<span class="maj-pastille">${inst.filter(i => i.miseAJour).length} maj</span>` : ''}</button><button class="view ${S.extTab === 'sources' ? 'on' : ''}" data-tab="sources">Registres</button></div>`;
+  const onglets = html`<div class="tabs"><button class="view ${S.extTab === 'catalog' ? 'on' : ''}" data-tab="catalog">Catalogue<span class="n">${cat.items.filter(it => !inst.some(i => i.extId === it.id || i.remplacePar?.id === it.id) && !cat.items.some(x => (x.manifest.replaces || []).some(r => r.id === it.id))).length}</span></button><button class="view ${S.extTab === 'installed' ? 'on' : ''}" data-tab="installed">Mes services<span class="n">${inst.length}</span>${inst.some(i => i.miseAJour) ? html`<span class="maj-pastille">${inst.filter(i => i.miseAJour).length} maj</span>` : ''}</button><button class="view ${S.extTab === 'sources' ? 'on' : ''}" data-tab="sources">Registres</button></div>`;
   let corps;
   // Ce qui est déjà en service n'a plus sa place au catalogue : il vit dans
   // « Mes services », et c'est de là qu'on lui ajoute une deuxième machine.
@@ -504,6 +504,8 @@ async function viewExt(el, t) {
   // Une extension qui en remplace une en service (renommage) arrive par la
   // mise à jour de celle-ci, pas par une deuxième installation.
   const posés = new Set(inst.flatMap(i => [i.extId, i.remplacePar?.id].filter(Boolean)));
+  // Une extension qu'une autre remplace (DIALEKT → MuxAI) ne se propose plus : on installe la nouvelle.
+  for (const it of cat.items) for (const r of it.manifest.replaces || []) posés.add(r.id);
   const dispo = cat.items.filter(it => !posés.has(it.id));
   if (S.extTab === 'catalog') {
     corps = dispo.length ? html`<div class="cat">${dispo.map(it => {

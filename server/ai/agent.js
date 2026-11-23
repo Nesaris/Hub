@@ -1571,7 +1571,7 @@ ${JSON.stringify(this.donneesConversation(ctx))}
     if (!s.cible) return { reponse: `**${s.nom}** n’a pas d’interface web à publier.` };
     const domaines = [...new Set([...(etat.domaines || []).map(d => d.nom || d), ...(etat.zonesCloudflare || []).map(z => z.nom || z.name || z)].map(String).filter(Boolean))];
     if (!domaines.length) return { reponse: 'Aucun domaine dans **Connexions** : ajoute le tien (Connexions → Domaines), puis redemande-moi.' };
-    // Un nom écrit en entier dans la demande (« sur console.zeylab.tech ») l'emporte.
+    // Un nom écrit en entier dans la demande (« sur console.example.com ») l'emporte.
     const ecrit = /\b([a-z0-9][a-z0-9-]{0,62})\.([a-z0-9-]+(?:\.[a-z0-9-]+)+)\b/i.exec(texte);
     const domaine = ecrit && domaines.includes(ecrit[2].toLowerCase()) ? ecrit[2].toLowerCase() : domaines[0];
     const prefixe = ecrit && domaines.includes(ecrit[2].toLowerCase()) ? ecrit[1].toLowerCase() : s.nom.toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 63);
