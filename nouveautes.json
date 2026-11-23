@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.22.3",
+    "date": "2026-11-23",
+    "points": [
+      "CodVault (dépôt privé) a son logo, livré avec le Hub ; Ollama prend l’icône de son site (nouveau champ de manifeste « site »)."
+    ]
+  },
+  {
     "version": "0.22.2",
     "date": "2026-11-23",
     "points": [

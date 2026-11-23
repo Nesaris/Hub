@@ -6,6 +6,7 @@
   "version": "1.0.0",
   "description": "Modèles d'IA locaux, sur cette machine ou sur un autre ordinateur du réseau.",
   "icon": "chip",
+  "site": "ollama.com",
   "repository": "https://github.com/CodexX64/hub-registry",
   "license": "MIT",
   "minHubVersion": "1.0.0",

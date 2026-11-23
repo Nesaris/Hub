@@ -24,6 +24,7 @@ const DOMAINE = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,
 const MAX_PAGE = 600_000;
 const MAX_IMAGE = 300_000;
 const REESSAI_MS = 86_400_000;
+const INTEGRES = path.join(import.meta.dirname, '..', 'registry-local', 'logos');
 
 export function domaineValide(d) {
   const h = String(d || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
@@ -168,6 +169,12 @@ export class Logos {
     }
     this.echecs.set(base, Date.now());
     return null;
+  }
+
+  /** Le logo livré avec le Hub (registry-local/logos), pour un dépôt privé que le Hub ne peut pas lire. */
+  integre(id) {
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(id)) return null;
+    try { return { buf: svgPropre(fs.readFileSync(path.join(INTEGRES, `${id}.svg`))), type: 'image/svg+xml' }; } catch { return null; }
   }
 
   oublier(id) { try { fs.unlinkSync(this.fichier(id)); } catch { /* */ } this.echecs.delete(id); }

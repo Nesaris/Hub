@@ -737,6 +737,9 @@ test('logos des extensions : pris dans leur dépôt, SVG contrôlé et servi fer
   assert.equal((await admin.get('/api/extensions/vox/logo')).status, 404, 'un SVG qui porte du script est refusé entier');
   assert.equal((await admin.get('/api/extensions/docker-control/logo')).status, 404, 'pas de logo : le picto reste');
   assert.equal((await admin.get('/api/extensions/inconnue/logo')).status, 404);
+  // Dépôt privé (CodVault) : le logo livré avec le Hub ; un identifiant tordu n'en tire rien.
+  assert.match(hub.logos.integre('codvault')?.buf.toString() || '', /^<svg[\s\S]*<\/svg>$/);
+  assert.equal(hub.logos.integre('../package'), null);
   assert.equal((await fetch(`${base}/api/extensions/synapse/logo`)).status, 401, 'réservé aux connectés');
   // Un chemin qui sort du dépôt ne passe pas le manifeste.
   const { validateManifest } = await import('../server/registry.js');

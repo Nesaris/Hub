@@ -129,7 +129,10 @@ export function registerRoutes(routeur, h) {
   // Le logo qu'une extension publie dans son dépôt (sinon : 404, et l'interface garde le picto).
   r.get('/api/extensions/:id/logo', async ctx => {
     let e; try { e = registry.get(ctx.params.id); } catch { throw new HttpError(404, 'Pas de logo'); }
-    const l = await logos?.extension(e.id, e.version, e.manifest, (rel, max) => registry.readFile(e.origin, rel, max)).catch(() => null);
+    // Le dépôt d'abord ; puis le logo livré avec le Hub (dépôt privé) ; puis l'icône du site du logiciel.
+    const l = await logos?.extension(e.id, e.version, e.manifest, (rel, max) => registry.readFile(e.origin, rel, max)).catch(() => null)
+      || logos?.integre(e.id)
+      || (e.manifest.site ? await logos?.obtenir(`site-${e.id}`, e.manifest.site).catch(() => null) : null);
     if (!l) throw new HttpError(404, 'Pas de logo');
     ctx.res.writeHead(200, { 'Content-Type': l.type, 'Content-Length': l.buf.length, 'Cache-Control': 'private, max-age=86400',
       'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'Content-Disposition': 'attachment; filename="logo"', 'Cross-Origin-Resource-Policy': 'same-origin' });
