@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.22.2",
+    "date": "2026-11-23",
+    "points": [
+      "Un logo qui a déjà sa propre tuile (Nesmail) remplit sa case, sans cadre blanc autour."
+    ]
+  },
+  {
     "version": "0.22.1",
     "date": "2026-11-23",
     "points": [

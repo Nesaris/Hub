@@ -2520,7 +2520,22 @@ function logoTuile(id, nom, couleur, taille = 44, domaine = '') {
 // La politique de contenu interdit les gestionnaires en ligne : l'échec d'un logo se traite ici.
 // Pareil pour les logos d'extensions, partout d'un coup : load et error ne
 // remontent pas, mais se captent sur le document.
-document.addEventListener('load', e => { if (e.target?.matches?.('.logo-ext img') && e.target.naturalWidth) e.target.parentElement.classList.add('a-logo'); }, true);
+// Un logo d'application (Nesmail) a déjà sa propre tuile, fond compris : il
+// remplit la case, sans cadre blanc autour. On le reconnaît à ses quatre bords,
+// pleins au milieu.
+function logoPlein(img) {
+  try {
+    const n = 32, c = Object.assign(document.createElement('canvas'), { width: n, height: n }), x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0, n, n);
+    return [[n / 2, 1], [n / 2, n - 2], [1, n / 2], [n - 2, n / 2]].every(([a, b]) => x.getImageData(a, b, 1, 1).data[3] > 200);
+  } catch { return false; }
+}
+document.addEventListener('load', e => {
+  const img = e.target;
+  if (!img?.matches?.('.logo-ext img') || !img.naturalWidth) return;
+  img.parentElement.classList.add('a-logo');
+  if (logoPlein(img)) img.parentElement.classList.add('plein');
+}, true);
 document.addEventListener('error', e => { if (e.target?.matches?.('.logo-ext img')) e.target.remove(); }, true);
 function brancherLogos(root) {
   $$('.logo img', root).forEach(img => {
