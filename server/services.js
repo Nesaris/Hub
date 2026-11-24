@@ -719,6 +719,38 @@ export class Services {
     return neuves;
   }
 
+  /**
+   * Les mises à jour de sécurité imposées : un manifeste peut déclarer
+   * « security.minimumVersion » (faille critique ou exploitée). Toute
+   * installation en dessous passe à la version du catalogue sans attendre de
+   * clic, une à la fois ; un échec est réessayé six heures plus tard.
+   */
+  async imposerSecurite(actor = 'hub (sécurité)') {
+    const faites = [];
+    const essais = { ...(this.db.setting('securite_essais', {}) || {}) };
+    for (const inst of this.list()) {
+      let entry; try { entry = this.registry.get(inst.ext_id); } catch { continue; }
+      const min = entry?.manifest?.security?.minimumVersion;
+      if (!min || compareVersions(inst.version, min) >= 0 || compareVersions(entry.manifest.version, min) < 0) continue;
+      const cle = `${inst.id}:${min}`;
+      if (Date.now() - (essais[cle] || 0) < 6 * 3600e3) continue;
+      essais[cle] = Date.now();
+      this.db.setSetting('securite_essais', essais);
+      const avant = inst.version;
+      try {
+        await this.update(inst.id, actor);
+        this.audit?.write(actor, 'service.mise_à_jour_imposée', inst.name, { de: avant, vers: entry.manifest.version, avis: (entry.manifest.security.advisories || []).slice(0, 10) });
+        faites.push({ nom: inst.name, de: avant, vers: entry.manifest.version, avis: entry.manifest.security.advisories || [] });
+      } catch (e) {
+        log.warn('services', `${inst.name} : mise à jour de sécurité imposée en échec — ${e.message}`);
+        faites.push({ nom: inst.name, de: avant, vers: entry.manifest.version, erreur: e.message });
+      }
+    }
+    for (const k of Object.keys(essais)) if (Date.now() - essais[k] > 30 * 86400e3) delete essais[k];
+    this.db.setSetting('securite_essais', essais);
+    return faites;
+  }
+
   /** La version proposée par le catalogue, si elle est plus récente que celle en place. */
   versionDisponible(inst) {
     const remplacant = this.registry?.remplacantDe?.(inst.ext_id);

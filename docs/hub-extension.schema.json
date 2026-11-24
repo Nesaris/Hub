@@ -45,6 +45,16 @@
       "type": "string",
       "description": "Nom d'un picto du Hub (server, memory, ticket, map, mail, mic, chip, router…) ou chemin relatif vers un SVG 24x24 au trait."
     },
+    "security": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimumVersion"],
+      "description": "Correctif de sécurité imposé : toute installation en dessous de minimumVersion est mise à jour par le Hub sans attendre de clic.",
+      "properties": {
+        "minimumVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+        "advisories": { "type": "array", "maxItems": 20, "items": { "type": "string", "pattern": "^[A-Za-z0-9-]{3,40}$" } }
+      }
+    },
     "site": {
       "type": "string",
       "pattern": "^([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,24}$",

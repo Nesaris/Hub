@@ -55,3 +55,32 @@ test('mise à jour : le manifeste est relu avant, et une relecture impossible ne
   assert.deepEqual(await s.update('synapse', 'ana'), { synchro: 'i1' });
   assert.deepEqual(relus, ['synapse']);
 });
+
+test('sécurité : sous security.minimumVersion, le Hub met à jour sans attendre de clic, une fois par tranche de six heures', async () => {
+  const { Services } = await import('../server/services.js');
+  const { createValidator } = await import('../server/manifest/validator.js');
+  const schema = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../server/manifest/schema.json'), 'utf8'));
+  const valider = createValidator(schema);
+  assert.ok(valider({ ...base, security: { minimumVersion: '1.0.1', advisories: ['CVE-2026-100001'] } }).valid);
+  assert.ok(!valider({ ...base, security: { minimumVersion: 'latest' } }).valid);
+  assert.ok(!valider({ ...base, security: { advisories: [] } }).valid, 'version minimale obligatoire');
+  const db = openDb(':memory:');
+  const instances = [
+    { id: 'a', name: 'nesmail', ext_id: 'nesmail', mode: 'compose', version: '2.4.0' },
+    { id: 'b', name: 'mapmylan', ext_id: 'mapmylan', mode: 'compose', version: '2.6.3' },
+    { id: 'c', name: 'vigie', ext_id: 'vigie', mode: 'compose', version: '1.5.0' },
+  ];
+  const catalogue = {
+    nesmail: { manifest: { version: '2.4.1', security: { minimumVersion: '2.4.1', advisories: ['CVE-2026-100001'] } } },
+    mapmylan: { manifest: { version: '2.6.3', security: { minimumVersion: '2.6.3' } } },
+    vigie: { manifest: { version: '1.5.0' } },
+  };
+  const faits = [], journal = [];
+  const s = Object.create(Services.prototype);
+  Object.assign(s, { db, audit: { write: (...a) => journal.push(a) }, registry: { get: id => catalogue[id] }, list: () => instances, update: async id => { faits.push(id); } });
+  const l = await s.imposerSecurite();
+  assert.deepEqual(faits, ['a'], 'seul celui en dessous de la version minimale');
+  assert.deepEqual(l, [{ nom: 'nesmail', de: '2.4.0', vers: '2.4.1', avis: ['CVE-2026-100001'] }]);
+  assert.equal(journal[0][1], 'service.mise_à_jour_imposée');
+  assert.deepEqual(await s.imposerSecurite(), [], 'pas de nouvel essai avant six heures');
+});

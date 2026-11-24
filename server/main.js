@@ -216,6 +216,9 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
     // Une image reconstruite sur la machine, même version : « Mettre à jour » s'allume aussi.
     setTimeout(() => services.verifierImagesLocales().catch(signaler('images')), 30000).unref();
     setInterval(() => services.verifierImagesLocales().catch(signaler('images')), 300000).unref();
+    // Après chaque lecture du catalogue : les mises à jour de sécurité imposées.
+    let securite = null;
+    bus.on('catalog', () => { clearTimeout(securite); securite = setTimeout(() => services.imposerSecurite().then(l => { for (const x of l) alertes.signaler('maj', x.erreur ? `⚠️ Mise à jour de sécurité de ${x.nom} (v${x.de} → v${x.vers}) en échec : ${x.erreur}` : `🔒 Mise à jour de sécurité imposée — ${x.nom} : v${x.de} → v${x.vers}${x.avis.length ? ` (${x.avis.slice(0, 3).join(', ')})` : ''}`).catch(() => {}); }).catch(signaler('sécurité')), 5000); securite.unref?.(); });
     let relance = null;
     bus.on('instance', () => { clearTimeout(relance); relance = setTimeout(() => { cerveau.publier().catch(signaler('cerveau')); voix.synchroniserLien().catch(signaler('voix')); services.verifierImagesLocales().catch(signaler('images')); }, 10000); relance.unref(); });
     registry.refresh().catch(e => log.warn('catalogue', e.message));

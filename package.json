@@ -1,6 +1,6 @@
 {
   "name": "hub",
-  "version": "0.22.4",
+  "version": "0.23.0",
   "description": "Hub centralisé de services auto-hébergés : extensions, services distants, déclencheurs, sondes, workflows et agent IA.",
   "type": "module",
   "private": true,

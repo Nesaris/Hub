@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.23.0",
+    "date": "2026-11-24",
+    "points": [
+      "Mises à jour de sécurité imposées : quand un service publie un correctif critique (champ de manifeste « security.minimumVersion »), le Hub l’installe de lui-même et te prévient sur Telegram."
+    ]
+  },
+  {
     "version": "0.22.4",
     "date": "2026-11-24",
     "points": [
