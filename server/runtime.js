@@ -61,7 +61,10 @@ export class Runtime {
     const headers = { Accept: 'application/json', 'User-Agent': `hub/${config.version}`, ...stringMap(render(req.headers || {}, ctx)) };
     const auth = m.api?.auth || { type: 'none' };
     if (ctx.service.token) {
-      if (auth.type === 'bearer') headers.Authorization = `Bearer ${ctx.service.token}`;
+      // Le jeton d'administration des comptes (socle commun) se présente toujours en Bearer,
+      // quelle que soit l'authentification de l'API courante du service (parfois aucune).
+      if (opts.tokenKey) headers.Authorization = `Bearer ${ctx.service.token}`;
+      else if (auth.type === 'bearer') headers.Authorization = `Bearer ${ctx.service.token}`;
       else if (auth.type === 'header') headers[auth.header || 'X-Api-Key'] = ctx.service.token;
     }
     let body;

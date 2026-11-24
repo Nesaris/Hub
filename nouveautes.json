@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.23.1",
+    "date": "2026-11-24",
+    "points": [
+      "Comptes des services : le jeton d’administration part toujours au bon format, même pour un service sans authentification d’API déclarée (CodVault : erreur 502 corrigée)."
+    ]
+  },
+  {
     "version": "0.23.0",
     "date": "2026-11-24",
     "points": [
