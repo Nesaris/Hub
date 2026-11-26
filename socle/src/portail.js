@@ -77,11 +77,22 @@ export class Portail {
 
   ctxCle(ctx) { return { securise: ctx.cleIci, origine: ctx.origine, rpId: ctx.rpId }; }
 
+  // « Rester connecté » : sans la case, le cookie de session meurt avec le
+  // navigateur (la session reste bornée côté serveur dans les deux cas). Le
+  // choix fait au mot de passe vaut pour les étapes suivantes (second facteur).
   poserSession(ctx, s) {
-    const maxAge = Math.max(0, (s.expire - Date.now()) / 1000);
+    const rester = ctx.rester ?? ctx.cookies?.[this.nomCookie(ctx, 'rst')] !== '0';
+    const maxAge = rester ? Math.max(0, (s.expire - Date.now()) / 1000) : null;
     poseCookie(ctx.res, this.nomCookie(ctx, 'sid'), s.jeton, { maxAge, secure: ctx.securise });
   }
-  effacerSession(ctx) { poseCookie(ctx.res, this.nomCookie(ctx, 'sid'), '', { maxAge: 0, secure: ctx.securise }); }
+  retenir(ctx, oui) {
+    ctx.rester = !!oui;
+    poseCookie(ctx.res, this.nomCookie(ctx, 'rst'), oui ? '1' : '0', { maxAge: null, secure: ctx.securise });
+  }
+  effacerSession(ctx) {
+    poseCookie(ctx.res, this.nomCookie(ctx, 'sid'), '', { maxAge: 0, secure: ctx.securise });
+    poseCookie(ctx.res, this.nomCookie(ctx, 'rst'), '', { maxAge: 0, secure: ctx.securise });
+  }
 
   // Origine de la requête : même origine que le service, ou une origine
   // déclarée. Un formulaire posté depuis un autre site n'atteint rien.
@@ -238,9 +249,10 @@ export class Portail {
 
     if (m === 'POST' && p === '/api/compte/connexion') {
       this.controlerOrigine(ctx);
-      const b = await this.corps(ctx, { identifiant: S.identifiant, motDePasse: S.motDePasse, preuve: S.preuve });
-      const s = await c.connexionMotDePasse({ ...b, ip, appareil, cleIci });
+      const b = await this.corps(ctx, { identifiant: S.identifiant, motDePasse: S.motDePasse, preuve: S.preuve, rester: { type: 'booleen' } });
+      const s = await c.connexionMotDePasse({ identifiant: b.identifiant, motDePasse: b.motDePasse, preuve: b.preuve, ip, appareil, cleIci });
       if (ctx.session) c.fermerSession(ctx.session.id);
+      if (b.rester !== undefined) this.retenir(ctx, b.rester);
       return ouvre(s);
     }
 
@@ -273,7 +285,8 @@ export class Portail {
 
     if (m === 'POST' && p === '/api/compte/connexion/cle') {
       this.controlerOrigine(ctx);
-      const b = await this.corps(ctx, { reponse: S.reponse });
+      const b = await this.corps(ctx, { reponse: S.reponse, rester: { type: 'booleen' } });
+      if (b.rester !== undefined && ctx.session?.niveau !== 'partiel') this.retenir(ctx, b.rester);
       let lien;
       if (ctx.session?.niveau === 'partiel') lien = ctx.session.id;
       else {

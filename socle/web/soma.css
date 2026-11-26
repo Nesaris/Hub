@@ -975,12 +975,23 @@ html[data-gamme="lavande"] .fenetre-disposition{background:var(--l-verre);backdr
 .secret-clair{font-family:var(--mono);font-size:12px;background:var(--well);border-radius:6px;padding:4px 8px;user-select:all;overflow-wrap:anywhere}
 
 /* porte « givre » (givre.js) : deux mains en points derrière une vitre dépolie.
-   Palette propre au décor, de jour comme de nuit, quelle que soit la gamme. */
-:root .porte.givre{--paper:#fbfdff;--surface:rgba(255,255,255,.5);--ink:#16263a;--ink-soft:#24364b;--muted:#5d7186;--faint:#7f93a6;--accent:#1593bd;
-  --hair:rgba(120,165,200,.34);--hair-soft:rgba(130,175,210,.24);--well:rgba(255,255,255,.58);
-  background:#fbfdff;align-items:flex-start;padding-top:var(--givre-haut,30vh);color:var(--ink)}
+   Sa police, Inter Tight, n'est chargée que si le décor s'affiche. */
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:400;src:url(polices/inter-tight-latin-400-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:400;src:url(polices/inter-tight-latin-ext-400-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:500;src:url(polices/inter-tight-latin-500-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:500;src:url(polices/inter-tight-latin-ext-500-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:600;src:url(polices/inter-tight-latin-600-normal.woff2) format("woff2");unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Inter Tight";font-style:normal;font-display:swap;font-weight:600;src:url(polices/inter-tight-latin-ext-600-normal.woff2) format("woff2");unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+/* Palette et gabarit propres au décor, de jour comme de nuit, quelle que soit la gamme. */
+:root .porte.givre{--paper:#fbfdff;--surface:rgba(255,255,255,.5);--ink:#16263a;--ink-soft:#24364b;--muted:#5d7186;--faint:#7f93a6;--accent:#24aad6;
+  --hair:rgba(120,165,200,.32);--hair-soft:rgba(130,175,210,.22);--well:rgba(255,255,255,.58);--g-survol:rgba(255,255,255,.72);--g-focus:rgba(255,255,255,.82);
+  --g-lien:rgba(22,38,58,.25);--g-alt:rgba(255,255,255,.45);--g-alt-survol:rgba(255,255,255,.75);--g-erreur:#c24468;--g-place:#93a6b8;
+  --g-btn:linear-gradient(180deg,#22364d,#14223a);--g-btn-texte:#fff;
+  background:#fbfdff;align-items:flex-start;padding:var(--givre-haut,30vh) 16px 0;color:var(--ink);font-family:"Inter Tight",var(--sans);font-size:15px;line-height:1.45}
 :root .porte.givre.nuit{--paper:#0c1420;--surface:rgba(18,32,48,.5);--ink:#e3eef7;--ink-soft:#c9dae8;--muted:#93a9bc;--faint:#7890a5;--accent:#4cc6ec;
-  --hair:rgba(140,190,225,.22);--hair-soft:rgba(140,190,225,.14);--well:rgba(10,22,36,.55);background:#0c1420}
+  --hair:rgba(140,190,225,.22);--hair-soft:rgba(140,190,225,.14);--well:rgba(10,22,36,.55);--g-survol:rgba(16,30,46,.7);--g-focus:rgba(16,30,46,.85);
+  --g-lien:rgba(227,238,247,.3);--g-alt:rgba(255,255,255,.05);--g-alt-survol:rgba(255,255,255,.1);--g-erreur:#f08aa6;--g-place:#6f869b;
+  --g-btn:linear-gradient(180deg,#eaf3fa,#cddfed);--g-btn-texte:#0c1420;background:#0c1420}
 .porte.givre .halos{display:none}
 .porte.givre .givre-fond,.porte.givre .givre-mains{position:fixed;inset:0;width:100%;height:100%;display:block}
 .porte.givre .givre-fond{z-index:0;pointer-events:none}
@@ -989,29 +1000,75 @@ html[data-gamme="lavande"] .fenetre-disposition{background:var(--l-verre);backdr
   background:radial-gradient(closest-side,rgba(255,255,255,1),rgba(140,220,245,.75) 28%,rgba(36,170,214,.18) 60%,transparent)}
 .porte.givre .givre-eclat.go{animation:givre-eclat 1.6s cubic-bezier(.2,.7,.2,1) forwards}
 @keyframes givre-eclat{0%{opacity:0;transform:scale(.2)}18%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(2.2)}}
-:root .porte.givre .wiz{max-width:420px;margin:0 auto 44px;border-radius:26px;isolation:isolate;
+
+/* la vitre */
+:root .porte.givre .wiz{width:min(384px,100%);max-width:none;margin:0 auto 44px;padding:30px 28px 22px;border-radius:26px;isolation:isolate;
   background:linear-gradient(160deg,rgba(255,255,255,.56),rgba(232,244,252,.28) 55%,rgba(246,250,255,.44));
   -webkit-backdrop-filter:blur(12px) saturate(1.4);backdrop-filter:blur(12px) saturate(1.4);border:1px solid rgba(255,255,255,.9);
   box-shadow:inset 0 1px 0 rgba(255,255,255,1),inset 0 0 0 1px rgba(255,255,255,.35),0 0 0 1px rgba(130,175,210,.16),0 34px 70px -28px rgba(30,80,130,.34),0 10px 24px -12px rgba(30,80,130,.18);
   animation:givre-entree .9s cubic-bezier(.2,.8,.2,1) .5s both;transition:opacity .7s ease,transform .7s cubic-bezier(.2,.8,.2,1),filter .7s ease}
-:root .porte.givre .wiz.large{max-width:620px}
+:root .porte.givre .wiz.large{width:min(560px,100%)}
 :root .porte.givre.nuit .wiz{background:linear-gradient(160deg,rgba(30,52,74,.55),rgba(14,28,44,.35) 55%,rgba(24,42,62,.5));border-color:rgba(160,205,235,.22);
   box-shadow:inset 0 1px 0 rgba(200,230,250,.18),0 0 0 1px rgba(0,0,0,.2),0 34px 70px -28px rgba(0,0,0,.6),0 10px 24px -12px rgba(0,0,0,.4)}
 @keyframes givre-entree{from{opacity:0;transform:translateY(18px) scale(.97);filter:blur(10px)}to{opacity:1;transform:none;filter:none}}
-/* grain de givre dans la vitre, et reflet qui passe */
+.porte.givre .wiz.secoue{animation:givre-secoue .42s}
+@keyframes givre-secoue{20%,60%{transform:translateX(-7px)}40%,80%{transform:translateX(7px)}}
 .porte.givre .wiz::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.5;mix-blend-mode:soft-light;
   background:radial-gradient(120px 90px at 0 0,rgba(255,255,255,.95),transparent 70%),radial-gradient(150px 110px at 100% 100%,rgba(255,255,255,.8),transparent 70%),
   url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
 .porte.givre .wiz::after{content:"";position:absolute;z-index:-1;top:-40%;bottom:-40%;width:38%;left:-60%;pointer-events:none;transform:rotate(18deg);
-  background:linear-gradient(90deg,transparent,rgba(255,255,255,.5),transparent);animation:givre-reflet 9s ease-in-out 2.4s infinite}
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.55),transparent);animation:givre-reflet 9s ease-in-out 2.4s infinite}
 .porte.givre.nuit .wiz::after{background:linear-gradient(90deg,transparent,rgba(200,235,255,.12),transparent)}
 @keyframes givre-reflet{0%{left:-60%}22%,100%{left:130%}}
-.porte.givre .brand .g{background:var(--ink);color:var(--paper)}
-:root .porte.givre .field,:root .porte.givre .codes input{background:var(--well);border-color:var(--hair);border-radius:13px}
-:root .porte.givre .field:focus,:root .porte.givre .codes input:focus{border-color:var(--accent);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent)}
-.porte.givre .next{border-radius:13px;box-shadow:0 10px 22px -10px rgba(20,40,70,.55)}
-.porte.givre .wfoot{border-top-color:var(--hair-soft)}
-.porte.givre .credit{color:var(--muted)}
+
+/* contenu, au gabarit de la maquette */
+.porte.givre .whead,.porte.givre .wbody{padding:0}
+.porte.givre .brand-g{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;letter-spacing:.02em;color:var(--ink)}
+.porte.givre .brand-g .g{width:22px;height:22px;display:flex;align-items:center;justify-content:center;flex:none;color:var(--ink)}
+.porte.givre .brand-g .g svg,.porte.givre .brand-g .g img{width:22px;height:22px}
+.porte.givre .steps{margin:18px 0 0}
+.porte.givre h1{font-size:25px;line-height:1.15;letter-spacing:-.02em;font-weight:600;margin:20px 0 4px}
+.porte.givre .sub{margin:0 0 22px;color:var(--muted);font-size:14px;max-width:none}
+.porte.givre .grpf{margin-top:0}
+.porte.givre .champ{display:block;margin-bottom:14px}
+.porte.givre .champ .lbl{display:block;font-family:inherit;font-size:13px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--ink);margin:0 0 6px}
+.porte.givre .champ .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+:root .porte.givre .field{width:100%;height:46px;min-height:46px;padding:0 14px;font:inherit;font-size:15px;color:var(--ink);background:var(--well);border:1px solid var(--hair);border-radius:13px;outline:none;transition:border-color .2s,box-shadow .2s,background .2s}
+.porte.givre .field::placeholder{color:var(--g-place)}
+:root .porte.givre .field:hover{background:var(--g-survol)}
+:root .porte.givre .field:focus{border-color:var(--accent);background:var(--g-focus);box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 16%,transparent)}
+:root .porte.givre .codes input{background:var(--well);border-color:var(--hair);border-radius:13px}
+.porte.givre .in{position:relative}
+.porte.givre .in .field{padding-right:48px}
+.porte.givre .oeil{position:absolute;right:4px;top:4px;width:38px;height:38px;border:0;border-radius:10px;background:transparent;color:var(--muted);cursor:pointer;display:grid;place-items:center}
+.porte.givre .oeil:hover{color:var(--ink);background:var(--g-survol)}
+.porte.givre .msg{min-height:18px;margin:-6px 0 10px;font-size:13px;color:var(--g-erreur)}
+.porte.givre .msg.info{color:var(--muted)}
+.porte.givre .erreur{color:var(--g-erreur)}
+.porte.givre .ligne{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 0 20px;font-size:13px}
+.porte.givre .chk{display:flex;align-items:center;gap:8px;margin:0;font-weight:400;color:var(--muted);cursor:pointer;min-height:32px}
+.porte.givre .chk input{width:16px;height:16px;margin:0;accent-color:var(--accent)}
+.porte.givre a.oubli{color:var(--ink);text-decoration:none;border-bottom:1px solid var(--g-lien)}
+.porte.givre a.oubli:hover{border-bottom-color:var(--ink)}
+.porte.givre .btn-g,.porte.givre .next{width:100%;height:48px;border:0;border-radius:14px;font:inherit;font-size:15px;font-weight:600;cursor:pointer;justify-content:center;
+  color:var(--g-btn-texte);background:var(--g-btn);box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 10px 22px -10px rgba(20,40,70,.55);transition:transform .15s,box-shadow .2s}
+.porte.givre .btn-g:hover,.porte.givre .next:hover{opacity:1;box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 14px 26px -10px rgba(20,40,70,.6)}
+.porte.givre .btn-g:active,.porte.givre .next:active{transform:translateY(1px)}
+.porte.givre .btn-g .sp{display:none;width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:currentColor;animation:tourne .7s linear infinite;vertical-align:-3px;margin-right:8px}
+.porte.givre .btn-g[aria-busy] .sp{display:inline-block}
+.porte.givre .alt-g{width:100%;height:44px;margin-top:10px;border-radius:14px;font:inherit;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer;
+  background:var(--g-alt);border:1px solid var(--hair);display:flex;align-items:center;justify-content:center;gap:8px}
+.porte.givre .alt-g:hover{background:var(--g-alt-survol)}
+.porte.givre .alt-g[aria-busy]{opacity:.6;cursor:progress}
+.porte.givre .pied-g{margin-top:18px;padding-top:14px;border-top:1px solid var(--hair-soft);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.porte.givre .pied-g span{display:flex;align-items:center;gap:6px}
+.porte.givre .wfoot{padding:14px 0 0;margin-top:18px;border-top:1px solid var(--hair-soft);gap:10px}
+.porte.givre .wfoot:empty{display:none}
+.porte.givre .wfoot .retour{order:2;width:100%;justify-content:center}
+.porte.givre .note{border-radius:13px;font-size:13px;margin-bottom:16px}
+.porte.givre button:focus-visible,.porte.givre a:focus-visible,.porte.givre .chk input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.porte.givre .credit{left:max(3vw,16px);right:auto;bottom:16px;text-align:left;font-family:inherit;font-size:12px;color:var(--muted);opacity:.85}
+@media (max-width:600px){:root .porte.givre .wiz{padding:26px 22px 20px}.porte.givre .credit{display:none}}
 /* connexion aboutie : la vitre s'efface pendant que les mains se touchent */
 :root .porte.givre.fin .wiz{opacity:0;transform:translateY(-10px) scale(.98);filter:blur(8px);animation:none}
 .porte.givre.fin .credit{opacity:0;transition:opacity .5s}

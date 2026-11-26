@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.25.1",
+    "date": "2026-11-26",
+    "points": [
+      "Écran de connexion fidèle à la maquette givrée : marque sur une ligne, champs arrondis, œil pour afficher le mot de passe, « Rester connecté » et « Mot de passe oublié ? », bouton plein et clé d’accès en dessous, police Inter Tight.",
+      "« Rester connecté » décoché : la session se ferme avec le navigateur."
+    ]
+  },
+  {
     "version": "0.25.0",
     "date": "2026-11-26",
     "points": [

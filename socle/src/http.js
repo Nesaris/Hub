@@ -118,7 +118,8 @@ export function lireCookies(entete = '') {
 }
 
 export function poseCookie(res, nom, valeur, { maxAge, secure, sameSite = 'Strict' }) {
-  const attributs = [`${nom}=${encodeURIComponent(valeur)}`, 'Path=/', 'HttpOnly', `SameSite=${sameSite}`, `Max-Age=${Math.max(0, Math.floor(maxAge))}`];
+  // maxAge null : cookie de session, effacé à la fermeture du navigateur.
+  const attributs = [`${nom}=${encodeURIComponent(valeur)}`, 'Path=/', 'HttpOnly', `SameSite=${sameSite}`, ...(maxAge === null ? [] : [`Max-Age=${Math.max(0, Math.floor(maxAge))}`])];
   if (secure) attributs.push('Secure');
   const avant = res.getHeader('Set-Cookie');
   res.setHeader('Set-Cookie', [...(Array.isArray(avant) ? avant : avant ? [avant] : []), attributs.join('; ')]);

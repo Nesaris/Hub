@@ -24,6 +24,9 @@ export function h(tag, props = {}, ...enfants) {
 }
 
 const PICTOS = {
+  oeil: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+  oeilBarre: '<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 20 20 4"/>',
+  cleAcces: '<circle cx="8" cy="9" r="4"/><path d="M2 21c0-3.3 2.7-6 6-6 1.6 0 3 .6 4 1.6"/><path d="M15.5 13.5a2.5 2.5 0 1 1 3.5 2.3V21l-1.2 1-1.3-1.2 1-1-1-1 1-1v-1"/>',
   cle: '<circle cx="8" cy="12" r="4.2"/><path d="M12.2 12H21M17.5 12v3.4M20 12v2.6"/>',
   bouclier: '<path d="M12 3.5 19 6.3v5.2c0 4.4-2.9 7.5-7 8.9-4.1-1.4-7-4.5-7-8.9V6.3z"/><path d="M9.6 12.1 11.4 13.9 15 10.3"/>',
   telephone: '<rect x="7" y="3" width="10" height="18" rx="2.4"/><path d="M11 17.5h2"/>',
@@ -411,8 +414,9 @@ function grouper(reglages) {
 export function porte({ api, service, marque = null, sousTitre = '', decor = '' }) {
   return new Promise(resolve => {
     const wiz = h('div', { class: 'wiz' });
+    const enGivre = decor === 'givre';
     const racine = h('div', { class: 'porte' }, h('div', { class: 'halos', 'aria-hidden': 'true' }, h('i'), h('i')), wiz,
-      h('div', { class: 'credit', text: `${service} · Codex64` }));
+      h('div', { class: 'credit', text: enGivre ? 'Frôle les mains · clic pour disperser' : `${service} · Codex64` }));
     document.body.append(racine);
     let givre = null, givreDemande = false;
     const poserDecor = () => {
@@ -422,7 +426,11 @@ export function porte({ api, service, marque = null, sousTitre = '', decor = '' 
     };
     const fermer = () => { givre?.arreter(); racine.remove(); };
 
-    const entete = (etapes = 0, courante = 0) => h('div', { class: 'whead' },
+    const entete = (etapes = 0, courante = 0) => enGivre
+      // Givre : la marque sur une ligne, comme la maquette ; le thème suit le système.
+      ? h('div', { class: 'whead' }, h('div', { class: 'brand-g' }, h('span', { class: 'g' }, marque ? marque.cloneNode(true) : icone('bouclier', 18)), h('span', { text: service })),
+        etapes > 1 ? h('div', { class: 'steps', 'aria-hidden': 'true' }, Array.from({ length: etapes }, (_, i) => h('i', { class: i < courante ? 'done' : i === courante ? 'now' : '' }))) : null)
+      : h('div', { class: 'whead' },
       h('div', { class: 'brand' }, h('div', { class: 'g' }, marque ? marque.cloneNode(true) : icone('bouclier', 18)),
         h('div', {}, h('b', { text: service }), h('span', { text: sousTitre || 'Accès protégé' })), h('div', { class: 'th' }, basculeTheme())),
       etapes > 1 ? h('div', { class: 'steps', 'aria-hidden': 'true' }, Array.from({ length: etapes }, (_, i) => h('i', { class: i < courante ? 'done' : i === courante ? 'now' : '' }))) : null);
@@ -562,7 +570,71 @@ export function porte({ api, service, marque = null, sousTitre = '', decor = '' 
       wiz.lastElementChild.remove();
     }
 
+    // Connexion au gabarit de la maquette givre : identifiant, mot de passe
+    // (avec l'œil), « Rester connecté », bouton plein, clé d'accès en dessous.
+    function connexionGivre(e) {
+      const err = h('p', { class: 'msg', role: 'alert' });
+      const parMdp = e.politique.motdepasse !== 'desactive';
+      const avecCle = e.cles && clesDisponibles();
+      const rester = h('input', { type: 'checkbox', name: 'rester' });
+      const secouer = () => { wiz.classList.remove('secoue'); void wiz.offsetWidth; wiz.classList.add('secoue'); };
+      const echec = (x, champFautif) => { err.classList.remove('info'); err.textContent = x instanceof DOMException ? raisonCle(x) : x.message; champFautif?.focus(); secouer(); };
+      const corps = [bandeauContexte(e)];
+      let cle = null;
+      if (avecCle) {
+        cle = h('button', { class: 'alt-g', type: 'button' }, icone('cleAcces', 17), 'Utiliser une clé d’accès');
+        cle.addEventListener('click', async () => {
+          err.textContent = ''; cle.setAttribute('aria-busy', 'true');
+          try {
+            const o = await api.post('/api/compte/connexion/cle/options');
+            await api.post('/api/compte/connexion/cle', { reponse: await utiliserCle(o), rester: rester.checked });
+            suite();
+          } catch (x) { echec(x); } finally { cle.removeAttribute('aria-busy'); }
+        });
+      }
+      if (parMdp) {
+        const ident = champ('Identifiant', { autocomplete: 'username webauthn', autocapitalize: 'none', spellcheck: false, placeholder: 'nom d’utilisateur' });
+        const mdp = champ('Mot de passe', { type: 'password', autocomplete: 'current-password', placeholder: '••••••••••' });
+        const oeil = h('button', { class: 'oeil', type: 'button', 'aria-label': 'Afficher le mot de passe', 'aria-pressed': 'false' }, icone('oeil', 18));
+        oeil.addEventListener('click', ev => {
+          ev.preventDefault();
+          const voir = mdp.input.type === 'password';
+          mdp.input.type = voir ? 'text' : 'password';
+          oeil.setAttribute('aria-pressed', String(voir)); oeil.setAttribute('aria-label', voir ? 'Masquer le mot de passe' : 'Afficher le mot de passe');
+          oeil.replaceChildren(icone(voir ? 'oeilBarre' : 'oeil', 18)); mdp.input.focus();
+        });
+        const boite = h('div', { class: 'in' }); mdp.input.replaceWith(boite); boite.append(mdp.input, oeil);
+        for (const c of [ident, mdp]) c.input.addEventListener('input', () => { err.textContent = ''; });
+        const oubli = h('a', { href: '#', class: 'oubli', text: 'Mot de passe oublié ?' });
+        oubli.addEventListener('click', ev => { ev.preventDefault(); err.classList.add('info'); err.textContent = 'Demande un lien de réinitialisation à ton administrateur.'; });
+        const libelle = h('span', { text: 'Se connecter' });
+        const go = h('button', { class: 'btn-g', type: 'submit' }, h('span', { class: 'sp', 'aria-hidden': 'true' }), libelle);
+        const envoyer = async (preuve) => {
+          try {
+            await api.post('/api/compte/connexion', { identifiant: ident.input.value.trim(), motDePasse: mdp.input.value, rester: rester.checked, ...(preuve ? { preuve } : {}) });
+          } catch (x) {
+            if (x.status === 428 && x.details?.preuve && !preuve) return envoyer(await resoudrePreuve(x.details.preuve));
+            throw x;
+          }
+        };
+        corps.push(h('form', { onsubmit: async ev => {
+          ev.preventDefault();
+          if (go.hasAttribute('aria-busy')) return;
+          if (!ident.input.value.trim()) return echec(new Error('Indique ton identifiant.'), ident.input);
+          if (!mdp.input.value) return echec(new Error('Indique ton mot de passe.'), mdp.input);
+          err.textContent = ''; go.setAttribute('aria-busy', 'true'); libelle.textContent = 'Vérification…';
+          try { await envoyer(); mdp.input.value = ''; suite(); } catch (x) { echec(x, mdp.input); } finally { go.removeAttribute('aria-busy'); libelle.textContent = 'Se connecter'; }
+        } }, ident.noeud, mdp.noeud, err, h('div', { class: 'ligne' }, h('label', { class: 'chk' }, rester, 'Rester connecté'), oubli), go, cle));
+      } else {
+        corps.push(err, h('div', { class: 'ligne' }, h('label', { class: 'chk' }, rester, 'Rester connecté')), cle);
+      }
+      corps.push(h('div', { class: 'pied-g' }, h('span', {}, icone('cadenas', 12), e.securise ? 'Connexion chiffrée' : 'Connexion non chiffrée'), h('span', { text: service })));
+      ecran({ titre: 'Connexion', sous: parMdp ? 'Content de te revoir. Identifie-toi pour continuer.' : 'Ce service se passe de mot de passe : ta clé d’accès suffit.', corps });
+      wiz.lastElementChild.remove();
+    }
+
     function connexion(e) {
+      if (enGivre) return connexionGivre(e);
       const err = h('p', { class: 'erreur', role: 'alert' });
       const ident = champ('Identifiant', { autocomplete: 'username webauthn', autocapitalize: 'none', spellcheck: false });
       const mdp = champ('Mot de passe', { type: 'password', autocomplete: 'current-password' });

@@ -100,6 +100,21 @@ test('connexion : mot de passe + TOTP, rejeu refusé, énumération impossible',
   assert.equal(r.status, 401, 'même code rejoué');
 });
 
+test('« Rester connecté » : sans la case, le cookie meurt avec le navigateur, jusqu’au second facteur compris', async () => {
+  const sid = r => r.setCookie.find(x => /-sid=/.test(x)) || '';
+  const sans = s.client();
+  let r = await sans.post('/api/compte/connexion', { identifiant: 'ana', motDePasse: MDP, rester: false });
+  assert.equal(r.status, 200); assert.doesNotMatch(sid(r), /Max-Age/i, 'session partielle : cookie de session');
+  avance(31_000);
+  r = await sans.post('/api/compte/connexion/totp', { code: codeTotp(secretAdmin) });
+  assert.equal(r.json.niveau, 'complet'); assert.doesNotMatch(sid(r), /Max-Age/i, 'le choix suit au second facteur');
+  const avec = s.client();
+  r = await avec.post('/api/compte/connexion', { identifiant: 'ana', motDePasse: MDP, rester: true });
+  assert.match(sid(r), /Max-Age=\d+/, 'case cochée : le cookie dure autant que la session');
+  r = await s.client().post('/api/compte/connexion', { identifiant: 'ana', motDePasse: MDP });
+  assert.match(sid(r), /Max-Age=\d+/, 'sans le champ (anciens clients) : comme avant');
+});
+
 test('connexion par clé seule, puis par code de secours à usage unique', async () => {
   const c = s.client();
   let r = await connexionCle(c, cleAdmin);
