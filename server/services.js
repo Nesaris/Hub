@@ -449,9 +449,15 @@ export class Services {
     return { url: p.url, hostUrl: adresseHote(p), name: p.name, id: p.id, config, jetonCerveau: nom => jetonCerveau(secret, nom) };
   }
 
-  resoudreConfig(manifest) {
+  resoudreConfig(manifest, { mode = 'compose' } = {}) {
     const out = {};
     for (const f of manifest.config || []) {
+      // Ce que le Hub trouve sur sa propre machine : n'a de sens que pour un service qu'il y installe.
+      if (f.detect) {
+        const v = mode === 'compose' ? this.detecter(f.detect) : null;
+        if (v) out[f.key] = { valeur: v, service: 'cette machine' };
+        continue;
+      }
       const r = f.resolve;
       if (!r?.capability) continue;
       const p = this.fournisseurPour(r.capability);
@@ -463,6 +469,14 @@ export class Services {
       out[f.key] = { valeur: v, service: p.name };
     }
     return out;
+  }
+
+  detecter(quoi) {
+    if (quoi === 'hub.http') return this.hubEnHttps ? (this.hubEnHttps() ? '0' : '1') : null;
+    const route = this.reseauHote?.() || null;
+    if (quoi === 'host.interface') return route?.carte || null;
+    if (quoi === 'host.subnet') return route?.plage || null;
+    return null;
   }
 
   // Vue publique : secrets remplacés par un indicateur.
@@ -522,7 +536,7 @@ export class Services {
     // configurée de la même façon. La valeur fournie l'emporte, sauf si
     // c'est le simple défaut du manifeste — celui-là n'a été choisi par
     // personne.
-    const resolus = this.resoudreConfig(m);
+    const resolus = this.resoudreConfig(m, { mode });
     for (const [cle, r] of Object.entries(resolus)) {
       const def = (m.config || []).find(f => f.key === cle)?.default;
       const v = given[cle];

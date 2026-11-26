@@ -930,6 +930,34 @@ test('config : ce qu’un service installé sait déjà n’est pas redemandé',
   assert.deepEqual(s.resoudreConfig(manifest), {});
 });
 
+test('réglages : ce que le Hub trouve sur sa machine (carte, plage, HTTPS) est prérempli ; introuvable, le champ reste à demander', async () => {
+  const { Services } = await import('../server/services.js');
+  const { lireHote, plageDe } = await import('../server/mesures.js');
+  assert.equal(plageDe('10.30.10.130/24'), '10.30.10.0/24');
+  assert.equal(plageDe('192.168.1.77/16'), '192.168.0.0/16');
+  assert.equal(plageDe('300.1.1.1/24'), null); assert.equal(plageDe('10.0.0.1/40'), null); assert.equal(plageDe(''), null);
+  assert.deepEqual(lireHote('t 1\nroute eth0 10.30.10.130/24\n').route, { carte: 'eth0', plage: '10.30.10.0/24' });
+  assert.equal(lireHote('t 1\nroute eth0;rm 10.0.0.1/8\n').route, null, 'un nom de carte bizarre est ignoré');
+  const s = Object.create(Services.prototype);
+  s.list = () => [];
+  const manifest = { config: [
+    { key: 'SCAN_INTERFACE', default: 'eth0', required: true, detect: 'host.interface' },
+    { key: 'SCAN_SUBNET', default: '198.51.100.0/24', required: true, detect: 'host.subnet' },
+    { key: 'SOCLE_HTTP', default: '0', required: true, detect: 'hub.http' },
+  ] };
+  // Sans hub-mesure ni rien de connu : rien n'est inventé.
+  assert.deepEqual(s.resoudreConfig(manifest), {});
+  s.reseauHote = () => ({ carte: 'ens18', plage: '10.30.10.0/24' });
+  s.hubEnHttps = () => true;
+  const out = s.resoudreConfig(manifest);
+  assert.deepEqual([out.SCAN_INTERFACE.valeur, out.SCAN_SUBNET.valeur, out.SOCLE_HTTP.valeur], ['ens18', '10.30.10.0/24', '0']);
+  assert.equal(out.SCAN_SUBNET.service, 'cette machine');
+  s.hubEnHttps = () => false;
+  assert.equal(s.resoudreConfig(manifest).SOCLE_HTTP.valeur, '1', 'Hub en HTTP seul : le service aussi');
+  // Un service connecté à distance tourne sur une autre machine : celle du Hub ne dit rien de lui.
+  assert.deepEqual(s.resoudreConfig(manifest, { mode: 'remote' }), {});
+});
+
 test('catalogue : une limite GitHub n’empêche que la découverte, pas la mise à jour', async () => {
   const { Registry } = await import('../server/registry.js');
   const connus = [{ origin: JSON.stringify({ type: 'github', repo: 'CodexX64/synapse', ref: 'main' }) },
@@ -2661,7 +2689,7 @@ test('mesures : débits par écart entre deux relevés, regroupés par extension
   const db = openDb(path.join(dir, 'h.db'));
   // Fichier de hub-mesure : deux cartes physiques, processeur et mémoire.
   const hote = (t, rx, tx, occupe, repos) => fs.writeFileSync(path.join(dir, 'hote'), `t ${t / 1000}\ncpu  ${occupe} 0 0 ${repos} 0 0 0 0 0 0\nMemTotal:       8000000 kB\nMemAvailable:   2000000 kB\nif eth0 ${rx} ${tx}\nif eth1 0 0\n`);
-  assert.deepEqual(lireHote('t 10\ncpu  1 2 3 4 5 6 7 8\nMemTotal: 4 kB\nMemAvailable: 1 kB\nif eth0 100 50\nif eth1 1 2\n'), { t: 10000, cpu: { total: 36, repos: 9 }, memTotal: 4096, memDispo: 1024, rx: 101, tx: 52, cartes: 2 });
+  assert.deepEqual(lireHote('t 10\ncpu  1 2 3 4 5 6 7 8\nMemTotal: 4 kB\nMemAvailable: 1 kB\nif eth0 100 50\nif eth1 1 2\n'), { t: 10000, cpu: { total: 36, repos: 9 }, memTotal: 4096, memDispo: 1024, rx: 101, tx: 52, cartes: 2, route: null });
   let t = Math.floor(Date.now() / TRANCHE) * TRANCHE + 10e3;
   const compteurs = { a: { rx: 1000, tx: 500, cpu: 0 }, h: { rx: 0, tx: 0, cpu: 0 }, x: { rx: 0, tx: 0, cpu: 0 } };
   const docker = async chemin => {

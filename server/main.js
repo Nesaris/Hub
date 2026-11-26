@@ -143,6 +143,9 @@ export async function buildHub({ dbFile = path.join(config.dataDir, 'hub.db'), d
   try { const n = store.remettreEnPlace(); if (n) log.info('workflows', `${n} workflow(s) mal disposé(s) remis en place`); } catch (e) { log.warn('workflows', 'mise en place', e.message); }
   const probes = new Probes({ db, bus, services, runtime });
   const mesures = new Mesures({ db, services, dossier: config.mesureDir });
+  // Ce que le Hub sait de sa machine, pour préremplir les réglages (detect des manifestes).
+  services.reseauHote = () => mesures.reseauHote();
+  services.hubEnHttps = () => !!tls || !!db.setting('relais_ip', '');
   const accounts = new Accounts({ services, runtime, audit, comptes: socle.comptes, db, vault });
   const secrets = new Secrets({ db, vault, audit });
   poserFuseau(db.setting('fuseau', '') || config.fuseau);

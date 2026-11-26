@@ -741,6 +741,10 @@
             }
           }
         },
+        "detect": {
+          "enum": ["host.interface", "host.subnet", "hub.http"],
+          "description": "Valeur que le Hub trouve seul sur sa machine : la carte réseau de la route par défaut (host.interface), sa plage en CIDR (host.subnet), ou « 1 » si le Hub n'est servi qu'en HTTP et « 0 » s'il l'est en HTTPS (hub.http). Non trouvée, le champ est demandé."
+        },
         "showIf": {
           "type": "object",
           "description": "Le champ n'apparaît que si chaque champ nommé vaut l'une des valeurs listées. Ex. {\"ADVERSAIRE\": [\"claude-api\", \"openai\"]}. Masqué, il n'est ni affiché ni envoyé.",

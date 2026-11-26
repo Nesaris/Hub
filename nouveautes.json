@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.24.0",
+    "date": "2026-11-26",
+    "points": [
+      "Installer un service ne demande plus que ce que personne ne sait : le reste est prérempli et rangé sous « Réglages préremplis », modifiable ici ou plus tard.",
+      "Le Hub trouve seul la carte réseau et la plage de sa machine, et s’il est servi en HTTPS (nouveau champ de manifeste « detect ») : MapMyLAN s’installe sans rien remplir."
+    ]
+  },
+  {
     "version": "0.23.1",
     "date": "2026-11-24",
     "points": [

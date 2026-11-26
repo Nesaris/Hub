@@ -169,7 +169,7 @@ export function registerRoutes(routeur, h) {
   // par capacité — sont répondables ici.
   // Ce que le Hub peut remplir tout seul pour cette extension, en
   // interrogeant les services déjà installés.
-  r.get('/api/catalog/:extId/resolve', ctx => services.resoudreConfig(registry.get(ctx.params.extId).manifest));
+  r.get('/api/catalog/:extId/resolve', ctx => services.resoudreConfig(registry.get(ctx.params.extId).manifest, { mode: ctx.url.searchParams.get('mode') === 'remote' ? 'remote' : 'compose' }));
 
   r.post('/api/catalog/:extId/options', async ctx => {
     const m = registry.get(ctx.params.extId).manifest;

@@ -42,7 +42,7 @@ export function clientDocker(hote = process.env.DOCKER_HOST || 'unix:///var/run/
 
 // Fichier écrit par outils/mesure-hote.sh.
 export function lireHote(texte) {
-  const o = { t: 0, cpu: null, memTotal: 0, memDispo: 0, rx: 0, tx: 0, cartes: 0 };
+  const o = { t: 0, cpu: null, memTotal: 0, memDispo: 0, rx: 0, tx: 0, cartes: 0, route: null };
   for (const l of String(texte).split('\n')) {
     const c = l.trim().split(/\s+/);
     if (c[0] === 't') o.t = Number(c[1]) * 1000;
@@ -50,8 +50,21 @@ export function lireHote(texte) {
     else if (c[0] === 'MemTotal:') o.memTotal = Number(c[1]) * 1024;
     else if (c[0] === 'MemAvailable:') o.memDispo = Number(c[1]) * 1024;
     else if (c[0] === 'if' && c.length >= 4) { o.rx += Number(c[2]) || 0; o.tx += Number(c[3]) || 0; o.cartes++; }
+    else if (c[0] === 'route' && /^[\w.@-]{1,15}$/.test(c[1] || '')) o.route = { carte: c[1], plage: plageDe(c[2]) };
   }
   return o;
+}
+
+// « 10.30.10.130/24 » → « 10.30.10.0/24 » : la plage du réseau, pas l'adresse de la machine.
+export function plageDe(cidr) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(String(cidr || ''));
+  if (!m) return null;
+  const o = m.slice(1, 5).map(Number), n = Number(m[5]);
+  if (o.some(x => x > 255) || n > 32) return null;
+  const ip = ((o[0] << 24) >>> 0) + (o[1] << 16) + (o[2] << 8) + o[3];
+  const masque = n === 0 ? 0 : (0xffffffff << (32 - n)) >>> 0;
+  const r = (ip & masque) >>> 0;
+  return `${r >>> 24}.${(r >>> 16) & 255}.${(r >>> 8) & 255}.${r & 255}/${n}`;
 }
 
 // Mémoire d'un conteneur, comme « docker stats » : sans le cache de fichiers.
@@ -99,6 +112,11 @@ export class Mesures {
       const h = lireHote(fs.readFileSync(path.join(this.dossier, 'hote'), 'utf8'));
       return h.t && this.maintenant() - h.t < 120e3 && h.cpu ? h : null;   // un relevé figé ne dit plus rien
     } catch { return null; }
+  }
+
+  /** La carte de la route par défaut de la machine et sa plage, si hub-mesure tourne. */
+  reseauHote() {
+    return this.lireFichierHote()?.route || null;
   }
 
   async releve() {

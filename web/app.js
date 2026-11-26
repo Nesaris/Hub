@@ -5,7 +5,7 @@ import { porte, pageSecurite, pageComptes, basculeTheme, appliquerTheme, icone, 
 import { courbe, jauge, calendrier } from '/socle/graphes.js';
 import { installerDisposition, controleDisposition, choisirDisposition, choixPersonnel, schemaDisposition, LIBELLES_DISPOSITION } from '/socle/disposition.js';
 import { I, P } from './icons.js';
-import { $, $$, html, poser, rendre, element, defileEncore, api, session, GET, POST, PUT, PATCH, DEL, toast, fail, pulse, modal, confirmBox, formulaire, readForm, bindDynamic, when, sparkSvg, statusTag, originChip, ecouterApercu } from './lib.js';
+import { $, $$, html, poser, rendre, element, defileEncore, api, session, GET, POST, PUT, PATCH, DEL, toast, fail, pulse, modal, confirmBox, formulaire, champForm, readForm, bindDynamic, when, sparkSvg, statusTag, originChip, ecouterApercu } from './lib.js';
 import { openEditor } from './editor.js';
 import { basculerVoix, monter as monterVoix, tourVocal, rejouer, arreter as arreterVoix, brancher as brancherVoix } from './voix.js';
 import { surveiller as surveillerListes } from './choix.js';
@@ -685,7 +685,7 @@ function permsOf(m) {
   return out;
 }
 
-function addServiceDialog(m, mode, item = null) {
+async function addServiceDialog(m, mode, item = null) {
   const remote = mode === 'remote';
   const perms = permsOf(m);
   // Une extension adaptée par l'IA : sa provenance, sa licence et son Compose, à relire avant d'accorder.
@@ -700,24 +700,42 @@ function addServiceDialog(m, mode, item = null) {
     && (!f.optionsFrom || f.optionsFrom.from?.capability));
   const r = m.install.remote || {};
   const steps = [];
+  // On ne demande que ce que personne ne sait : un champ obligatoire sans
+  // valeur par défaut, ou que le Hub n'a pas su trouver lui-même (un autre
+  // service, sa machine). Le reste est prérempli et rangé : on l'ouvre si on
+  // veut, on le change aussi plus tard dans la fiche du service.
+  const champs = fields.filter(f => remote ? true : !/REMOTE|PROXY/i.test(f.key));
+  const resolus = await GET(`/api/catalog/${encodeURIComponent(m.id)}/resolve?mode=${remote ? 'remote' : 'compose'}`).catch(() => ({}));
+  const vide = v => v === undefined || v === null || v === '';
+  const aDemander = f => f.required && !resolus[f.key] && (vide(f.default) || !!f.detect);
+  const demandes = champs.filter(aDemander), ranges = champs.filter(f => !aDemander(f)).sort((a, b) => (a.advanced || a.key === "IMAGE_TAG") - (b.advanced || b.key === "IMAGE_TAG"));
+  const valeurs = Object.fromEntries(Object.entries(resolus).map(([k, x]) => [k, x.valeur]));
+  const champ = f => champForm(f, valeurs[f.key], { values: valeurs }, 'c');
   modal({
     title: `${remote ? 'Connecter' : 'Installer'} ${m.name}`,
     sub: remote ? 'Le service tourne déjà sur une autre machine.' : 'Le Hub télécharge, configure et démarre le conteneur.',
     body: html`
-      <div class="formgrid">
-        <div class="fl"><label for="svcName">Nom de l’instance</label><input class="field mono" id="svcName" value=${m.id}><div class="help">Minuscules, chiffres et tirets. Ex. ollama-gpu-pc</div></div>
-        ${remote ? html`<div class="fl"><label for="svcUrl">${r.label || 'Adresse'}</label><div class="row nowrap-row"><input class="field mono grow" id="svcUrl" placeholder=${r.placeholder || 'http://192.0.2.50:' + (r.defaultPort || 80)}><button class="btn sm" type="button" id="testUrl">Tester</button></div><div class="help" id="testRes"></div></div>` : ''}
-      </div>
       ${remote && r.setupHelp ? html`<div class="hookbox"><b>Sur l’autre machine</b><span>${r.setupHelp}</span></div>` : ''}
       ${!remote && perms.length ? html`<div class="hookbox warn"><b>${a ? 'À relire avant d’installer' : 'Permissions demandées'}</b>${perms.map(p => html`<span><b>${p.label}</b> — ${p.why}</span>`)}${a ? html`<details class="compose-relu"><summary>Fichier Compose écrit par le Hub</summary><pre class="mono">${a.compose}</pre></details>` : ''}<label class="check"><input type="checkbox" id="permOk"> ${a ? `J’ai relu, j’installe ${m.name}` : `J’accorde ces permissions à ${m.name}`}</label></div>` : ''}
-      ${fields.length ? html`<div id="cfgForm">${formulaire(fields.filter(f => remote ? true : !/REMOTE|PROXY/i.test(f.key)), {}, {}, 'c')}</div>` : ''}
+      <div id="cfgForm">
+        ${remote || demandes.length ? html`<div class="formgrid">
+          ${remote ? html`<div class="fl"><label for="svcUrl">${r.label || 'Adresse'}</label><div class="row nowrap-row"><input class="field mono grow" id="svcUrl" placeholder=${r.placeholder || 'http://192.0.2.50:' + (r.defaultPort || 80)}><button class="btn sm" type="button" id="testUrl">Tester</button></div><div class="help" id="testRes"></div></div>` : ''}
+          ${demandes.map(champ)}
+        </div>` : html`<p class="mini">Rien à remplir : le Hub a tout préparé.</p>`}
+        <details class="preremplis"><summary class="link small">Réglages préremplis (${ranges.length + 1}) — à changer seulement si besoin</summary><div class="gap"></div>
+          <div class="formgrid">
+            <div class="fl"><label for="svcName">Nom de l’instance</label><input class="field mono" id="svcName" value=${m.id}><div class="help">Minuscules, chiffres et tirets. Ex. ollama-gpu-pc</div></div>
+            ${ranges.map(champ)}
+          </div>
+        </details>
+      </div>
       <div class="term" id="steps" hidden></div>`,
     actions: [{ label: 'Annuler' }, { label: remote ? 'Connecter' : 'Installer', cls: 'solid', run: async modalEl => {
       const box = $('#steps', modalEl); box.hidden = false; poser(box, html`<div>Démarrage…</div>`);
       const onInstall = ev => { steps.push(ev); poser(box, etapes(steps)); };
       app.on('install', onInstall);
       try {
-        const cfg = $('#cfgForm', modalEl) ? readForm($('#cfgForm', modalEl)) : {};
+        const cfg = readForm($('#cfgForm', modalEl));
         if (!remote && perms.length && !$('#permOk', modalEl)?.checked) { poser(box, html`<div class="err">Coche la case des permissions pour installer.</div>`); listeners.get('install')?.delete(onInstall); return false; }
         const inst = await POST('/api/instances', { extId: m.id, name: $('#svcName', modalEl).value.trim(), mode: remote ? 'remote' : 'compose', url: remote ? $('#svcUrl', modalEl).value.trim() : undefined, config: cfg, acceptPermissions: perms.length > 0 });
         listeners.get('install')?.delete(onInstall);
@@ -744,24 +762,12 @@ function addServiceDialog(m, mode, item = null) {
       // Les listes qui vivent chez un autre service se chargent tout de
       // suite : l'utilisateur choisit un modèle au lieu de l'écrire.
       bindDynamic(m2, { extId: m.id }, 'config', null);
-      // Et ce qu'un service déjà installé sait déjà — son adresse, ses
-      // modèles — est rempli sans rien demander. L'utilisateur voit d'où
-      // ça vient et peut corriger : c'est une avance, pas un verrou.
-      try {
-        const resolus = await GET(`/api/catalog/${encodeURIComponent(m.id)}/resolve`);
-        for (const [cle, r2] of Object.entries(resolus)) {
-          const champ = [...m2.querySelectorAll('[data-key]')].find(x => x.dataset.key === cle);
-          if (!champ) continue;
-          // Ne pas écraser ce que l'utilisateur a saisi — mais le défaut du
-          // manifeste n'est pas une saisie : personne ne l'a choisi.
-          const def = (m.config || []).find(f => f.key === cle)?.default;
-          if (champ.value && champ.value !== String(def ?? '')) continue;
-          if (champ.tagName === 'SELECT' && ![...champ.options].some(o => o.value === r2.valeur)) champ.prepend(element(html`<option value=${r2.valeur}>${r2.valeur}</option>`));
-          champ.value = r2.valeur;
-          const aide = champ.closest('.fl')?.querySelector('.help');
-          if (aide) aide.prepend(element(html`<b>Repris de ${r2.service}.</b>`), ' ');
-        }
-      } catch { /* aucun fournisseur installé : on laisse la saisie */ }
+      // Ce qui vient d'ailleurs le dit : l'utilisateur voit d'où vient la valeur.
+      for (const [cle, x] of Object.entries(resolus)) {
+        const el = [...m2.querySelectorAll('[data-key]')].find(y => y.dataset.key === cle);
+        const aide = el?.closest('.fl')?.querySelector('.help');
+        if (aide) aide.prepend(element(html`<b>Repris de ${x.service}.</b>`), ' ');
+      }
       const tb = $('#testUrl', m2);
       if (tb) tb.onclick = async () => {
         const res = $('#testRes', m2);
