@@ -55,7 +55,7 @@ export function lireHote(texte) {
   return o;
 }
 
-// « 10.30.10.130/24 » → « 10.30.10.0/24 » : la plage du réseau, pas l'adresse de la machine.
+// « 192.0.2.130/24 » → « 192.0.2.0/24 » : la plage du réseau, pas l'adresse de la machine.
 export function plageDe(cidr) {
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\/(\d{1,2})$/.exec(String(cidr || ''));
   if (!m) return null;

@@ -933,10 +933,10 @@ test('config : ce qu’un service installé sait déjà n’est pas redemandé',
 test('réglages : ce que le Hub trouve sur sa machine (carte, plage, HTTPS) est prérempli ; introuvable, le champ reste à demander', async () => {
   const { Services } = await import('../server/services.js');
   const { lireHote, plageDe } = await import('../server/mesures.js');
-  assert.equal(plageDe('10.30.10.130/24'), '10.30.10.0/24');
+  assert.equal(plageDe('192.0.2.130/24'), '192.0.2.0/24');
   assert.equal(plageDe('192.168.1.77/16'), '192.168.0.0/16');
   assert.equal(plageDe('300.1.1.1/24'), null); assert.equal(plageDe('10.0.0.1/40'), null); assert.equal(plageDe(''), null);
-  assert.deepEqual(lireHote('t 1\nroute eth0 10.30.10.130/24\n').route, { carte: 'eth0', plage: '10.30.10.0/24' });
+  assert.deepEqual(lireHote('t 1\nroute eth0 192.0.2.130/24\n').route, { carte: 'eth0', plage: '192.0.2.0/24' });
   assert.equal(lireHote('t 1\nroute eth0;rm 10.0.0.1/8\n').route, null, 'un nom de carte bizarre est ignoré');
   const s = Object.create(Services.prototype);
   s.list = () => [];
@@ -947,10 +947,10 @@ test('réglages : ce que le Hub trouve sur sa machine (carte, plage, HTTPS) est 
   ] };
   // Sans hub-mesure ni rien de connu : rien n'est inventé.
   assert.deepEqual(s.resoudreConfig(manifest), {});
-  s.reseauHote = () => ({ carte: 'ens18', plage: '10.30.10.0/24' });
+  s.reseauHote = () => ({ carte: 'enp1s0', plage: '198.51.100.0/24' });
   s.hubEnHttps = () => true;
   const out = s.resoudreConfig(manifest);
-  assert.deepEqual([out.SCAN_INTERFACE.valeur, out.SCAN_SUBNET.valeur, out.SOCLE_HTTP.valeur], ['ens18', '10.30.10.0/24', '0']);
+  assert.deepEqual([out.SCAN_INTERFACE.valeur, out.SCAN_SUBNET.valeur, out.SOCLE_HTTP.valeur], ['enp1s0', '198.51.100.0/24', '0']);
   assert.equal(out.SCAN_SUBNET.service, 'cette machine');
   s.hubEnHttps = () => false;
   assert.equal(s.resoudreConfig(manifest).SOCLE_HTTP.valeur, '1', 'Hub en HTTP seul : le service aussi');
