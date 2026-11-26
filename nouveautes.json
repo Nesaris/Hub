@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.25.0",
+    "date": "2026-11-26",
+    "points": [
+      "Nouvel écran de connexion : deux mains de points derrière une vitre givrée. Elles s’écartent sous la souris, se dispersent au clic et se touchent quand la connexion aboutit. De jour comme de nuit, et immobile si ton appareil réduit les animations."
+    ]
+  },
+  {
     "version": "0.24.0",
     "date": "2026-11-26",
     "points": [

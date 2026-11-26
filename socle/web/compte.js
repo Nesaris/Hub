@@ -406,12 +406,21 @@ function grouper(reglages) {
 
 // Promesse résolue quand la session est complète : le service peut alors
 // monter son interface. marque : nœud du logo (optionnel).
-export function porte({ api, service, marque = null, sousTitre = '' }) {
+// decor : « givre » pose les deux mains en points derrière une vitre dépolie
+// (givre.js), seulement si un écran de la porte s'affiche vraiment.
+export function porte({ api, service, marque = null, sousTitre = '', decor = '' }) {
   return new Promise(resolve => {
     const wiz = h('div', { class: 'wiz' });
     const racine = h('div', { class: 'porte' }, h('div', { class: 'halos', 'aria-hidden': 'true' }, h('i'), h('i')), wiz,
       h('div', { class: 'credit', text: `${service} · Codex64` }));
     document.body.append(racine);
+    let givre = null, givreDemande = false;
+    const poserDecor = () => {
+      if (decor !== 'givre' || givreDemande) return;
+      givreDemande = true;
+      import('./givre.js').then(m => { if (racine.isConnected) givre = m.poserGivre(racine, wiz); }).catch(() => { /* décor absent : la porte ordinaire */ });
+    };
+    const fermer = () => { givre?.arreter(); racine.remove(); };
 
     const entete = (etapes = 0, courante = 0) => h('div', { class: 'whead' },
       h('div', { class: 'brand' }, h('div', { class: 'g' }, marque ? marque.cloneNode(true) : icone('bouclier', 18)),
@@ -423,6 +432,7 @@ export function porte({ api, service, marque = null, sousTitre = '' }) {
       wiz.replaceChildren(entete(etapes, courante), h('div', { class: 'wbody' }, h('h1', { text: titre }), sous ? h('p', { class: 'sub', text: sous }) : null, corps),
         pied.length ? h('div', { class: 'wfoot' }, pied) : h('div', { class: 'wfoot' }));
       wiz.querySelector('input:not([type=checkbox])')?.focus();
+      poserDecor();
     };
 
     const occupe = async (bouton, zoneErreur, fn) => {
@@ -444,7 +454,9 @@ export function porte({ api, service, marque = null, sousTitre = '' }) {
       if (e.session.niveau === 'inscription') return inscription(e);
       if (e.session.compte.facteurs.secours === 0) return codesSecours(e);
       if (e.assistant?.doit) return e.session.compte.role === 'admin' ? assistant(e) : attenteAssistant(e);
-      racine.remove();
+      // Avec le givre, les deux mains se touchent avant que la porte s'efface.
+      if (givre) { givre.toucher(true); racine.classList.add('fin'); setTimeout(() => { givre.arreter(); racine.remove(); }, 1400); }
+      else fermer();
       resolve(e);
       // Après une mise à jour : ce qu'elle apporte, par-dessus l'interface montée.
       if (e.nouveautes) setTimeout(() => montrerNouveautes(api, e.nouveautes, service), 700);
@@ -732,7 +744,7 @@ export function porte({ api, service, marque = null, sousTitre = '' }) {
     async function codesSecours(e) {
       const err = h('p', { class: 'erreur', role: 'alert' });
       let r;
-      try { r = await api.post('/api/compte/secours'); } catch (x) { return ecran({ titre: 'Codes de secours', sous: x.message, pied: [h('button', { class: 'next', type: 'button', onclick: () => { racine.remove(); resolve(e); } }, 'Continuer')] }); }
+      try { r = await api.post('/api/compte/secours'); } catch (x) { return ecran({ titre: 'Codes de secours', sous: x.message, pied: [h('button', { class: 'next', type: 'button', onclick: () => { fermer(); resolve(e); } }, 'Continuer')] }); }
       const coche = h('input', { type: 'checkbox', id: 'range' });
       const go = h('button', { class: 'next', type: 'button', disabled: true, onclick: () => suite() }, 'Terminer', icone('verifie'));
       coche.addEventListener('change', () => { go.disabled = !coche.checked; });

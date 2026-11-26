@@ -129,7 +129,7 @@ function noteEtapes() {
 
 // Démarrage
 async function boot() {
-  const etat = await porte({ api, service: 'Hub', marque: logoMarque(20), sousTitre: 'centre de contrôle' });
+  const etat = await porte({ api, service: 'Hub', marque: logoMarque(20), sousTitre: 'centre de contrôle', decor: 'givre' });
   session.user = etat.session.compte.identifiant;
   session.role = etat.session.compte.role;
   surveillerListes();
