@@ -162,6 +162,9 @@ test('catalogue local chargé et validé', async () => {
   const cat = await api('GET', '/api/catalog');
   assert.deepEqual(cat.items.map(i => i.id).sort(), ['docker-control', 'ollama', 'relay', 'synapse', 'vox']);
   await assert.rejects(api('POST', '/api/catalog/import', { manifest: { id: 'x' } }), /invalide/);
+  // La fenêtre d'installation demande ce que le Hub a déjà trouvé, avec le mode voulu.
+  for (const mode of ['compose', 'remote']) assert.equal(typeof await api('GET', `/api/catalog/synapse/resolve?mode=${mode}`), 'object', mode);
+  await assert.rejects(api('GET', '/api/catalog/synapse/resolve?mode=autre'));
 });
 
 test('services distants, capacités requises et liens automatiques visibles', async () => {

@@ -1,5 +1,12 @@
 [
   {
+    "version": "0.25.2",
+    "date": "2026-11-27",
+    "points": [
+      "Installation d’un service : les valeurs trouvées par le Hub (carte réseau, plage, HTTPS, réglages d’un autre service) sont bien préremplies ; la 0.24.0 les redemandait par erreur."
+    ]
+  },
+  {
     "version": "0.25.1",
     "date": "2026-11-26",
     "points": [

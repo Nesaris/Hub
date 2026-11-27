@@ -60,6 +60,7 @@ export const SCHEMAS = {
   'POST /api/instances/:id/actions/:action': { corps: { params: JSONV(8), confirm: OUI } },
 
   'GET /api/mesures': { requete: { periode: TXT(3, { parmi: ['24h', '7j', '30j'] }) } },
+  'GET /api/catalog/:extId/resolve': { requete: { mode: TXT(7, { parmi: ['compose', 'remote'] }) } },
 
   'GET /api/probes/:instance/:probe': { requete: { hours: ENT(1, 24 * 90), labels: TXT(300) } },
   'POST /api/probes/:instance/:probe/read': { corps: VIDE },
