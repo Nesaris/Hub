@@ -1,5 +1,13 @@
 [
   {
+    "version": "0.26.0",
+    "date": "2026-11-27",
+    "points": [
+      "Première configuration plus courte : seul l’essentiel obligatoire est demandé ; le reste, déjà réglé, se passe en revue pas à pas ou se termine d’un clic.",
+      "Le décor givré devient l’écran d’entrée de tous les services de la suite."
+    ]
+  },
+  {
     "version": "0.25.2",
     "date": "2026-11-27",
     "points": [

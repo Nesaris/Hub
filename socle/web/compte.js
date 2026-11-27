@@ -409,9 +409,9 @@ function grouper(reglages) {
 
 // Promesse résolue quand la session est complète : le service peut alors
 // monter son interface. marque : nœud du logo (optionnel).
-// decor : « givre » pose les deux mains en points derrière une vitre dépolie
+// decor : « givre » (par défaut) pose les deux mains en points derrière une vitre dépolie ; « aucun » garde la porte simple
 // (givre.js), seulement si un écran de la porte s'affiche vraiment.
-export function porte({ api, service, marque = null, sousTitre = '', decor = '' }) {
+export function porte({ api, service, marque = null, sousTitre = '', decor = 'givre' }) {
   return new Promise(resolve => {
     const wiz = h('div', { class: 'wiz' });
     const enGivre = decor === 'givre';
@@ -480,28 +480,52 @@ export function porte({ api, service, marque = null, sousTitre = '', decor = '' 
       // Première fois : tout est nouveau, aucune pastille.
       const montres = premiere ? d.reglages.filter(r => r.source !== 'environnement').map(r => ({ ...r, nouveau: false })) : d.reglages.filter(r => r.nouveau);
       const fixes = premiere ? d.reglages.filter(r => r.source === 'environnement') : [];
-      const groupes = premiere ? grouper(montres) : [['Nouveaux réglages', montres]];
-      const etapes = groupes.length + 1;
-      const forms = groupes.map(([, rs]) => {
+      // Première fois : d'abord l'essentiel (obligatoire et sans valeur), puis
+      // le reste, déjà réglé, présenté étape par étape — chacune se passe, et
+      // on peut terminer à tout moment. Après une mise à jour : les nouveautés.
+      const essentiel = r => r.requis && (r.type === 'secret' ? !r.pose : (r.valeur === undefined || r.valeur === null || r.valeur === ''));
+      const liste = premiere
+        ? [...(montres.some(essentiel) ? [{ nom: 'L’essentiel', rs: montres.filter(essentiel), facultatif: false }] : []),
+          ...grouper(montres.filter(r => !essentiel(r))).map(([nom, rs]) => ({ nom, rs, facultatif: true }))]
+        : [{ nom: 'Nouveaux réglages', rs: montres, facultatif: false }];
+      const construire = rs => {
         const simples = rs.filter(r => !r.avance), avances = rs.filter(r => r.avance);
         const f = formulaireReglages([...simples, ...avances]);
         const corps = f.noeuds.slice(0, simples.length);
         if (avances.length) corps.push(h('details', { class: 'avances grpf' }, h('summary', { text: 'Réglages avancés' }), f.noeuds.slice(simples.length)));
         return { f, corps };
-      });
+      };
+      const forms = liste.map(x => construire(x.rs));
       const tout = () => Object.assign({}, ...forms.map(x => x.f.valeurs()));
       const err = h('p', { class: 'erreur', role: 'alert' });
+      const facultatives = liste.map((x, i) => i).filter(i => liste[i].facultatif);
+      // Le parcours : les étapes obligatoires, un aperçu du reste, chaque étape facultative, la fin.
+      const parcours = [...liste.map((x, i) => i).filter(i => !liste[i].facultatif).map(i => ({ groupe: i })),
+        ...(facultatives.length && premiere ? [{ apercu: true }] : []), ...facultatives.map(i => ({ groupe: i })), { fin: true }];
+      const etapes = parcours.length;
+      const position = quoi => parcours.findIndex(x => (quoi === 'fin' ? x.fin : quoi === 'apercu' ? x.apercu : x.groupe === quoi));
 
-      const montrer = i => {
-        const precedent = i > 0 ? h('button', { class: 'retour', type: 'button', onclick: () => montrer(i - 1) }, icone('retour'), 'Précédent') : piedDeconnexion();
-        if (i < groupes.length) {
-          const [nom] = groupes[i];
-          const suivant = h('button', { class: 'next', type: 'button', onclick: () => montrer(i + 1) }, 'Suivant', icone('fleche'));
-          return ecran({ etapes, courante: i, large: true,
-            titre: premiere ? nom : 'Nouveaux réglages',
-            sous: premiere ? (i === 0 ? `Première configuration de ${service}. Chaque valeur proposée convient pour commencer ; tout reste modifiable ensuite dans Comptes.` : null)
-              : `La mise à jour${d.version ? ` vers ${d.version}` : ''} apporte ${montres.length > 1 ? 'des réglages' : 'un réglage'} à confirmer. Le reste ne change pas.`,
-            corps: [h('div', { class: 'assistant-champs' }, forms[i].corps)], pied: [precedent, suivant] });
+      const montrer = pos => {
+        const etape = parcours[pos];
+        const precedent = pos > 0 ? h('button', { class: 'retour', type: 'button', onclick: () => montrer(pos - 1) }, icone('retour'), 'Précédent') : piedDeconnexion();
+        if (etape.apercu) {
+          const lignes = facultatives.map(i => h('button', { class: 'etape-ligne', type: 'button', onclick: () => montrer(position(i)) },
+            h('span', {}, h('b', { text: liste[i].nom }), h('small', { text: `${liste[i].rs.length} réglage${liste[i].rs.length > 1 ? 's' : ''}` })), icone('fleche')));
+          return ecran({ etapes, courante: pos, titre: liste.some(x => !x.facultatif) ? 'L’essentiel est fait' : 'Tout est déjà réglé',
+            sous: `Les valeurs proposées conviennent pour commencer. Passe en revue ce qui te parle, ou termine tout de suite : tout reste modifiable ensuite dans Comptes.`,
+            corps: [h('div', { class: 'etapes-liste grpf' }, lignes)],
+            pied: [precedent, h('button', { class: 'retour', type: 'button', onclick: () => montrer(pos + 1) }, 'Pas à pas'), h('button', { class: 'next', type: 'button', onclick: () => montrer(position('fin')) }, 'Terminer maintenant', icone('fleche'))] });
+        }
+        if (!etape.fin) {
+          const i = etape.groupe, x = liste[i];
+          const suivant = h('button', { class: 'next', type: 'button', onclick: () => montrer(pos + 1) }, 'Suivant', icone('fleche'));
+          const k = facultatives.indexOf(i);
+          const passer = x.facultatif ? h('button', { class: 'retour', type: 'button', onclick: () => { forms[i] = construire(x.rs); montrer(pos + 1); } }, 'Passer') : null;
+          return ecran({ etapes, courante: pos, large: true, titre: x.nom,
+            sous: !premiere ? `La mise à jour${d.version ? ` vers ${d.version}` : ''} apporte ${montres.length > 1 ? 'des réglages' : 'un réglage'} à confirmer. Le reste ne change pas.`
+              : x.facultatif ? `Facultatif — ${k + 1} sur ${facultatives.length}. Les valeurs proposées conviennent ; change seulement ce qui te parle.`
+              : `Première configuration de ${service} : ce qu’il faut pour démarrer. Le reste est déjà réglé.`,
+            corps: [h('div', { class: 'assistant-champs' }, forms[i].corps)], pied: [precedent, passer, suivant].filter(Boolean) });
         }
         const go = h('button', { class: 'next', type: 'button' }, premiere ? 'Terminer la configuration' : 'Enregistrer', icone('verifie'));
         go.addEventListener('click', () => occupe(go, err, async () => {
@@ -510,7 +534,7 @@ export function porte({ api, service, marque = null, sousTitre = '', decor = '' 
           try { r = await api.post('/api/compte/reglages', { valeurs: tout() }); } catch (x) {
             const fautifs = x.details?.champs || {};
             const k = forms.findIndex(fx => fx.f.erreurs(fautifs).length);
-            if (k >= 0) { montrer(k); forms[k].f.erreurs(fautifs); }
+            if (k >= 0) { montrer(position(k)); forms[k].f.erreurs(fautifs); }
             throw x;
           }
           if (r.redemarrage && r.automatique) {
@@ -527,7 +551,7 @@ export function porte({ api, service, marque = null, sousTitre = '', decor = '' 
           suite();
         }));
         const recap = Object.keys(tout());
-        ecran({ etapes, courante: groupes.length, large: true, titre: premiere ? 'Tout est prêt' : 'Confirmer',
+        ecran({ etapes, courante: pos, large: true, titre: premiere ? 'Tout est prêt' : 'Confirmer',
           sous: recap.length ? `${recap.length} réglage${recap.length > 1 ? 's' : ''} modifié${recap.length > 1 ? 's' : ''} par rapport aux valeurs proposées.` : 'Les valeurs proposées sont gardées.',
           corps: [fixes.length ? h('details', { class: 'grpf' }, h('summary', { text: `${fixes.length} réglage${fixes.length > 1 ? 's' : ''} fixé${fixes.length > 1 ? 's' : ''} par l’environnement` }), formulaireReglages(fixes).noeuds) : null, err],
           pied: [precedent, go] });
